@@ -2,7 +2,7 @@
 
 namespace Corax.Indexing
 {
-	public class StringTokenizer
+	public class StringTokenizer : ITokenSource
 	{
 		private bool _quoted;
 		private TextReader _reader;
@@ -21,7 +21,7 @@ namespace Corax.Indexing
 
 		public char[] Buffer { get; private set; }
 
-		public int Size { get; private set; }
+		public int Size { get; set; }
 
 		public int Line { get; private set; }
 
