@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Corax.Indexing;
 using Xunit;
 
 namespace Corax.Tests
@@ -64,7 +65,8 @@ namespace Corax.Tests
 
 		public IEnumerable<string> Tokenize(string s)
 		{
-			var x = new StringTokenizer(new StringReader(s));
+			var x = new StringTokenizer();
+			x.SetReader(new StringReader(s));
 			while (x.Next())
 			{
 				yield return new String(x.Buffer, 0, x.Size);

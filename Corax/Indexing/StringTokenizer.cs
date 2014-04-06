@@ -1,16 +1,22 @@
 ﻿using System.IO;
 
-namespace Corax
+namespace Corax.Indexing
 {
 	public class StringTokenizer
 	{
 		private bool _quoted;
 		private TextReader _reader;
 
-		public StringTokenizer(TextReader reader, int maxBufferSize = 256)
+		public StringTokenizer(int maxBufferSize = 256)
+		{
+			Buffer = new char[maxBufferSize];
+		}
+
+		public void SetReader(TextReader reader)
 		{
 			_reader = reader;
-			Buffer = new char[maxBufferSize];
+			Size = 0;
+			_quoted = false;
 		}
 
 		public char[] Buffer { get; private set; }
@@ -40,9 +46,7 @@ namespace Corax
 					if (_quoted && Size > 0)
 					{
 						// we have an unterminated string, so we will ignore the quote, instead of erroring
-						_reader = new StringReader(new string(Buffer, 0, Size));
-						_quoted = false;
-						Size = 0;
+						SetReader(new StringReader(new string(Buffer, 0, Size)));
 						curr = '\0';
 						continue;
 					}
