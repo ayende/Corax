@@ -68,7 +68,7 @@ namespace Corax.Indexing
 
 		private void FlushCurrentDocument()
 		{
-			if (CurrentDocumentId > 0)
+			if (CurrentDocumentId <= 0)
 				return;
 			_documentFields.Position = 0;
 
@@ -84,6 +84,12 @@ namespace Corax.Indexing
 			foreach (var kvp in _currentTerms)
 			{
 				var field = kvp.Key.Item1;
+				string tree;
+				if (_fieldTreesCache.TryGetValue(field, out tree) == false)
+				{
+					tree = "@" + field;
+					_fieldTreesCache[field] = tree;
+				}
 				var term = kvp.Key.Item2;
 				var info = kvp.Value;
 				var valBuffer = _bufferPool.Take(size);
@@ -92,7 +98,7 @@ namespace Corax.Indexing
 				EndianBitConverter.Big.CopyBytes(info.Freq, valBuffer, sizeof(long));
 				EndianBitConverter.Big.CopyBytes(info.Boost, valBuffer, sizeof(long) + sizeof(int));
 
-				_writeBatch.MultiAdd(new Slice(term.Buffer, (ushort) term.Size), new Slice(valBuffer), field);
+				_writeBatch.MultiAdd(new Slice(term.Buffer, (ushort)term.Size), new Slice(valBuffer), tree);
 			}
 
 
@@ -120,12 +126,7 @@ namespace Corax.Indexing
 
 		public void AddField(string field, TextReader indexedValue = null, string storedValue = null, FieldOptions options = FieldOptions.None)
 		{
-			string tree;
-			if (_fieldTreesCache.TryGetValue(field, out tree) == false)
-			{
-				tree = "@" + field;
-				_fieldTreesCache[field] = tree;
-			}
+			
 
 			if (storedValue != null)
 			{

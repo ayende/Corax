@@ -118,5 +118,10 @@ namespace Corax.Indexing
 		{
 			Buffer[Size++] = curr;
 		}
+
+		public override string ToString()
+		{
+			return new string(Buffer, 0, Size);
+		}
 	}
 }

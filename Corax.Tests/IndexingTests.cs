@@ -58,6 +58,27 @@ namespace Corax.Tests
 		}
 
 		[Fact]
+		public void WillFilterStopWords()
+		{
+			using (var fti = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fti.CreateIndexer())
+				{
+					indexer.NewDocument();
+
+					indexer.AddField("Name", "Oren and Ayende");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fti.CreateSearcher())
+				{
+					Assert.Empty(searcher.Query(new TermQuery("Name", "and")));
+				}
+			}
+		}
+
+		[Fact]
 		public void CanQueryUsingSingleTerm()
 		{
 			using (var fti = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
@@ -73,7 +94,7 @@ namespace Corax.Tests
 
 				using (var searcher = fti.CreateSearcher())
 				{
-					Assert.Empty(searcher.Query(new TermQuery("Name", "Arava")));
+					Assert.NotEmpty(searcher.Query(new TermQuery("Name", "oren")));
 				}
 			}
 		}
