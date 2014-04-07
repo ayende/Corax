@@ -5,8 +5,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corax", "Corax\Corax.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corax.Tests", "Corax.Tests\Corax.Tests.csproj", "{73121271-D49F-4A00-8634-D37CBB20453C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voron", "..\ravendb-3.0\Raven.Voron\Voron\Voron.csproj", "{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{B09CAC12-9109-49CD-B50E-169076CE05E0}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
@@ -28,10 +26,6 @@ Global
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

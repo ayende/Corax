@@ -40,8 +40,12 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="xunit">
-      <HintPath>..\..\ravendb-3.0\SharedLibs\xunit\xunit.dll</HintPath>
+    <Reference Include="Voron">
+      <HintPath>..\SharedLibs\Voron.dll</HintPath>
+    </Reference>
+    <Reference Include="xunit, Version=1.9.2.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\SharedLibs\xunit.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -51,10 +55,6 @@
     <Compile Include="StringTokenizerTests.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\ravendb-3.0\Raven.Voron\Voron\Voron.csproj">
-      <Project>{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}</Project>
-      <Name>Voron</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Corax\Corax.csproj">
       <Project>{725A2392-504F-4D52-AE69-D52395DA0960}</Project>
       <Name>Corax</Name>
