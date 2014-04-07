@@ -101,7 +101,7 @@ namespace Corax.Indexing
 				_writeBatch.MultiAdd(new Slice(term.Buffer, (ushort)term.Size), new Slice(valBuffer), tree);
 			}
 
-
+			_currentTerms.Clear();
 			_documentFields = null;
 			_binaryWriter.SetOutput(Stream.Null);
 			CurrentDocumentId = -1;

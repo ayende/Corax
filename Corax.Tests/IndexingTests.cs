@@ -1,4 +1,5 @@
-﻿using Corax.Indexing;
+﻿using System.Linq;
+using Corax.Indexing;
 using Corax.Queries;
 using Voron;
 using Xunit;
@@ -81,20 +82,25 @@ namespace Corax.Tests
 		[Fact]
 		public void CanQueryUsingSingleTerm()
 		{
-			using (var fti = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
 			{
-				using (var indexer = fti.CreateIndexer())
+				using (var indexer = fullTextIndex.CreateIndexer())
 				{
 					indexer.NewDocument();
 
 					indexer.AddField("Name", "Oren Eini");
 
+					indexer.NewDocument();
+
+					indexer.AddField("Name", "Ayende Rahien");
+
 					indexer.Flush();
 				}
 
-				using (var searcher = fti.CreateSearcher())
+				using (var searcher = fullTextIndex.CreateSearcher())
 				{
-					Assert.NotEmpty(searcher.Query(new TermQuery("Name", "oren")));
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "oren")).Count());
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "rahien")).Count());
 				}
 			}
 		}

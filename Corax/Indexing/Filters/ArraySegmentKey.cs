@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 
 namespace Corax.Indexing.Filters
 {
@@ -41,7 +42,7 @@ namespace Corax.Indexing.Filters
 
 			for (int i = 0; i < _size; i++)
 			{
-				if (_buffer[i].Equals(other._buffer[i]) == false)
+				if (_buffer[i].Equals(other._buffer[i]))
 					return false;
 			}
 			return true;
@@ -66,6 +67,18 @@ namespace Corax.Indexing.Filters
 				}
 				return hc;
 			}
+		}
+
+		public override string ToString()
+		{
+			var c = _buffer as char[];
+			if (c != null)
+				return new string(c, 0, Size);
+			var b = _buffer as byte[];
+			if (b != null)
+				return Encoding.UTF8.GetString(b, 0, Size);
+
+			return base.ToString();
 		}
 	}
 }
