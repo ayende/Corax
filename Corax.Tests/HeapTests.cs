@@ -6,7 +6,7 @@ namespace Corax.Tests
 
 	public class HeapTests
 	{
-		readonly Heap<int> _heap = new Heap<int>(10, (x, y) => x - y);
+		readonly Heap<int> _heap = new Heap<int>(10);
 
 		[Fact]
 		public void CountStartsAtZero()

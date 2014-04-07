@@ -24,7 +24,7 @@ namespace Corax.Queries
 				throw new ArgumentException("Take must be non negative");
 
 			var qr = new QueryResults();
-			var heap = new Heap<QueryMatch>(take, (x, y) => x.Score.CompareTo(y.Score));
+			var heap = new Heap<QueryMatch>(take);
 			foreach (var match in Query(query, score))
 			{
 				heap.Enqueue(match);
