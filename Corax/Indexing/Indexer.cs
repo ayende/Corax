@@ -19,7 +19,8 @@ namespace Corax.Indexing
 		private readonly ReusableBinaryWriter _binaryWriter = new ReusableBinaryWriter();
 
 		private WriteBatch _writeBatch = new WriteBatch();
-		private readonly Dictionary<Tuple<string, ArraySegmentKey<byte>>, TermInfo> _currentTerms = new Dictionary<Tuple<string, ArraySegmentKey<byte>>, TermInfo>();
+		private readonly Dictionary<Tuple<string, ArraySegmentKey<byte>>, TermInfo> _currentTerms =
+			new Dictionary<Tuple<string, ArraySegmentKey<byte>>, TermInfo>();
 
 		public class TermInfo
 		{
@@ -48,7 +49,7 @@ namespace Corax.Indexing
 
 		public bool AutoFlush { get; set; }
 
-		public void NewDocument()
+		public void UpdateDocument(long id)
 		{
 			if (CurrentDocumentId > 0)
 			{
@@ -61,9 +62,14 @@ namespace Corax.Indexing
 					}
 				}
 			}
-			CurrentDocumentId = _parent.NextDocumentId();
+			CurrentDocumentId = id;
 			_documentFields = new BufferPoolMemoryStream(_bufferPool);
 			_binaryWriter.SetOutput(_documentFields);
+		}
+
+		public void NewDocument()
+		{
+			UpdateDocument(_parent.NextDocumentId());
 		}
 
 		private void FlushCurrentDocument()
@@ -126,8 +132,6 @@ namespace Corax.Indexing
 
 		public void AddField(string field, TextReader indexedValue = null, string storedValue = null, FieldOptions options = FieldOptions.None)
 		{
-			
-
 			if (storedValue != null)
 			{
 				var num = _parent.GetFieldNumber(field);
