@@ -107,6 +107,100 @@ namespace Corax.Tests
 
 
 		[Fact]
+		public void CanDelete()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.NewDocument();
+
+					indexer.AddField("Name", "Oren Eini");
+
+					indexer.NewDocument();
+
+					indexer.AddField("Name", "Ayende Rahien");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "oren")).Count());
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "rahien")).Count());
+				}
+
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.DeleteDocument(1);
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					Assert.Equal(0, searcher.Query(new TermQuery("Name", "oren")).Count());
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "rahien")).Count());
+				}
+
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.DeleteDocument(2);
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					Assert.Equal(0, searcher.Query(new TermQuery("Name", "oren")).Count());
+					Assert.Equal(0, searcher.Query(new TermQuery("Name", "rahien")).Count());
+				}
+
+			}
+		}
+
+		[Fact]
+		public void CanQueryAndUpdate()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.NewDocument(); // doc 1
+
+					Assert.Equal(1L, indexer.CurrentDocumentId);
+
+					indexer.AddField("Name", "Oren Eini");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "oren")).Count());
+				}
+
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.UpdateDocument(1); // doc 1
+
+					Assert.Equal(1L, indexer.CurrentDocumentId);
+
+					indexer.AddField("Name", "Ayende Rahien");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					Assert.Equal(0, searcher.Query(new TermQuery("Name", "oren")).Count());
+					Assert.Equal(1, searcher.Query(new TermQuery("Name", "ayende")).Count());
+				}
+			}
+		}
+
+
+		[Fact]
 		public void CanQueryUsingMissingTerm()
 		{
 			using (var fti = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))

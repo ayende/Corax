@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
 using System.Threading;
 using Corax.Indexing;
 using Corax.Queries;
@@ -20,6 +18,7 @@ namespace Corax
 		public Guid Id { get; private set; }
 		public BufferPool BufferPool { get; private set; }
 		public StorageEnvironment StorageEnvironment { get; private set; }
+
 		private readonly ConcurrentDictionary<string, int> _fieldsIds = new ConcurrentDictionary<string, int>();
 
 		public IndexingConventions Conventions { get; private set; }
@@ -55,8 +54,10 @@ namespace Corax
 				_lastFieldId++;
 
 				var wb = new WriteBatch();
-				wb.Add(field, new MemoryStream(BitConverter.GetBytes(_lastFieldId)), "Fields");
+				wb.Add(field, BitConverter.GetBytes(_lastFieldId), "Fields");
 				StorageEnvironment.Writer.Write(wb);
+
+				_fieldsIds.TryAdd(field, _lastFieldId);
 
 				return _lastFieldId;
 			}
@@ -69,7 +70,7 @@ namespace Corax
 			if (idVal == null)
 			{
 				Id = Guid.NewGuid();
-				metadata.Add(tx, "id", new MemoryStream(Id.ToByteArray()));
+				metadata.Add(tx, "id", Id.ToByteArray());
 			}
 			else
 			{

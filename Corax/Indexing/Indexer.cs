@@ -51,6 +51,12 @@ namespace Corax.Indexing
 
 		public void UpdateDocument(long id)
 		{
+			
+			SetCurrentDocument(id);
+		}
+
+		private void SetCurrentDocument(long id)
+		{
 			if (CurrentDocumentId > 0)
 			{
 				FlushCurrentDocument();
@@ -69,7 +75,11 @@ namespace Corax.Indexing
 
 		public void NewDocument()
 		{
-			UpdateDocument(_parent.NextDocumentId());
+			SetCurrentDocument(_parent.NextDocumentId());
+		}
+
+		public void DeleteDocument(long id)
+		{
 		}
 
 		private void FlushCurrentDocument()
