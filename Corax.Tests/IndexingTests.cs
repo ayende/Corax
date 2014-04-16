@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using Corax.Indexing;
 using Corax.Queries;
 using Voron;
@@ -133,13 +134,61 @@ namespace Corax.Tests
 
 				using (var searcher = fullTextIndex.CreateSearcher())
 				{
-					var results = searcher.QueryTop(new TermQuery("Name", "eini"), 5, sortBy: new Sorter
-					{
-						Field = "Email"
-					});
+					var results = searcher.QueryTop(new TermQuery("Name", "eini"), 5, sortBy: new Sorter("Email"));
 
+					Assert.Equal(2, results.Results[0].DocumentId);
+					Assert.Equal(1, results.Results[1].DocumentId);
+				}
+			}
+		}
+
+		[Fact]
+		public void CanQueryAndSortByTwoFields()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+
+					indexer.NewIndexEntry();
+					indexer.AddField("QueryFor", "yes");
+					indexer.AddField("FirstName", "David");
+					indexer.AddField("LastName", "Boike");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("QueryFor", "yes");
+					indexer.AddField("FirstName", "Natalie");
+					indexer.AddField("LastName", "Boike");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("QueryFor", "NO");
+					indexer.AddField("FirstName", "NO");
+					indexer.AddField("LastName", "NO");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("QueryFor", "yes");
+					indexer.AddField("FirstName", "Oren");
+					indexer.AddField("LastName", "Eini");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("QueryFor", "yes");
+					indexer.AddField("FirstName", "Arava");
+					indexer.AddField("LastName", "Eini");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					var results = searcher.QueryTop(new TermQuery("QueryFor", "yes"), 5, sortBy: new Sorter(new SortTerm("LastName"), new SortTerm("FirstName")));
+
+					Assert.Equal(4, results.Results.Length);
+					Console.WriteLine("{0}, {1}, {2}, {3}", results.Results[0].DocumentId, results.Results[1].DocumentId,
+						results.Results[2].DocumentId, results.Results[3].DocumentId);
 					Assert.Equal(1, results.Results[0].DocumentId);
 					Assert.Equal(2, results.Results[1].DocumentId);
+					Assert.Equal(5, results.Results[2].DocumentId);
+					Assert.Equal(4, results.Results[3].DocumentId);
 				}
 			}
 		}

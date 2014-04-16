@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using Corax.Utils;
 using Voron;
 using Voron.Impl;
@@ -51,23 +50,37 @@ namespace Corax.Queries
 			if (sortBy == null)
 				return (x, y) => x.CompareTo(y);
 
-			var fieldNumber = _index.GetFieldNumber(sortBy.Field);
+			int[] fieldNumbers = new int[sortBy.Terms.Length];
+			for (var i = 0; i < sortBy.Terms.Length; i++)
+				fieldNumbers[i] = _index.GetFieldNumber(sortBy.Terms[i].Field);
 
-			var factor = (sortBy.Descending ? -1 : 1);
-			return (x, y) =>
-			{
-				var xVal = GetTermForDocument(x.DocumentId, fieldNumber);
-				var yVal = GetTermForDocument(y.DocumentId, fieldNumber);
+				return (x, y) =>
+				{
+					for (int i=0; i<sortBy.Terms.Length; i++)
+					{
+						var term = sortBy.Terms[i];
+						int fieldNumber = fieldNumbers[i];
 
-				if (xVal == null && yVal == null)
+						var xVal = GetTermForDocument(x.DocumentId, fieldNumber);
+						var yVal = GetTermForDocument(y.DocumentId, fieldNumber);
+
+						if (xVal != null || yVal != null)
+						{
+							var factor = (term.Descending ? 1 : -1);
+							if (xVal == null)
+								return -1*factor;
+							if (yVal == null)
+								return 1*factor;
+
+							var result = xVal.CompareTo(yVal) * factor;
+
+							if (result != 0)
+								return result;
+						}
+					}
+
 					return 0;
-				if (xVal == null)
-					return -1 * factor;
-				if (yVal == null)
-					return 1 * factor;
-
-				return xVal.CompareTo(yVal) * factor;
-			};
+				};
 		}
 
 		public ValueReader GetTermForDocument(long docId, int fieldId)
@@ -131,7 +144,28 @@ namespace Corax.Queries
 
 	public class Sorter
 	{
+		public SortTerm[] Terms;
+
+		public Sorter(string field, bool descending = false)
+		{
+			Terms = new SortTerm[] {new SortTerm(field, descending)};
+		}
+
+		public Sorter(params SortTerm[] terms)
+		{
+			Terms = terms;
+		}
+	}
+
+	public class SortTerm
+	{
 		public string Field;
 		public bool Descending;
+
+		public SortTerm(string field, bool descending = false)
+		{
+			this.Field = field;
+			this.Descending = descending;
+		}
 	}
 }
