@@ -58,7 +58,8 @@ namespace Corax.Queries
 				sorter.Init(this);
 			}
 
-			return (x, y) => sortBy.Comparers.Select(term => term.Compare(x, y)).FirstOrDefault(ret => ret != 0);
+			return (x, y) => sortBy.Comparers.Select(term => term.Compare(x, y))
+				.FirstOrDefault(ret => ret != 0);
 		}
 
 		public ValueReader GetTermForDocument(long docId, int fieldId)

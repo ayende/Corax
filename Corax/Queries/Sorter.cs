@@ -30,7 +30,7 @@ namespace Corax.Queries
 		{
 
 		}
-
+ 
 		public int Compare(QueryMatch x, QueryMatch y)
 		{
 			return x.Score.CompareTo(y.Score);
