@@ -180,7 +180,7 @@ namespace Corax.Tests
 
 				using (var searcher = fullTextIndex.CreateSearcher())
 				{
-					var results = searcher.QueryTop(new TermQuery("QueryFor", "yes"), 5, sortBy: new Sorter(new SortTerm("LastName"), new SortTerm("FirstName")));
+					var results = searcher.QueryTop(new TermQuery("QueryFor", "yes"), 5, sortBy: new Sorter(new SortByTerm("LastName"), new SortByTerm("FirstName")));
 
 					Assert.Equal(4, results.Results.Length);
 					Console.WriteLine("{0}, {1}, {2}, {3}", results.Results[0].DocumentId, results.Results[1].DocumentId,

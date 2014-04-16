@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Corax.Utils;
 using Voron;
 using Voron.Impl;
@@ -21,6 +22,8 @@ namespace Corax.Queries
 
 			_docs = _tx.ReadTree("Docs");
 		}
+
+		public FullTextIndex Index { get { return _index; }}
 
 		public QueryResults QueryTop(Query query, int take,
 			IndexingConventions.ScorerCalc score = null,
@@ -50,39 +53,12 @@ namespace Corax.Queries
 			if (sortBy == null)
 				return (x, y) => x.Score.CompareTo(y.Score);
 
-			var fieldNumbers = new int[sortBy.Terms.Length];
-			for (var i = 0; i < sortBy.Terms.Length; i++)
-				fieldNumbers[i] = _index.GetFieldNumber(sortBy.Terms[i].Field);
-
-			return (x, y) =>
+			foreach (var sorter in sortBy.Comparers)
 			{
-				for (int i = 0; i < sortBy.Terms.Length; i++)
-				{
-					var term = sortBy.Terms[i];
-					int fieldNumber = fieldNumbers[i];
+				sorter.Init(this);
+			}
 
-					var xVal = GetTermForDocument(x.DocumentId, fieldNumber);
-					var yVal = GetTermForDocument(y.DocumentId, fieldNumber);
-
-					if (xVal == null && yVal == null)
-						continue;
-
-					var factor = (term.Descending ? 1 : -1);
-
-					if (xVal == null)
-						return -1 * factor;
-
-					if (yVal == null)
-						return 1 * factor;
-
-					var result = xVal.CompareTo(yVal) * factor;
-
-					if (result != 0)
-						return result;
-				}
-
-				return 0;
-			};
+			return (x, y) => sortBy.Comparers.Select(term => term.Compare(x, y)).FirstOrDefault(ret => ret != 0);
 		}
 
 		public ValueReader GetTermForDocument(long docId, int fieldId)
@@ -144,30 +120,4 @@ namespace Corax.Queries
 		}
 	}
 
-	public class Sorter
-	{
-		public readonly SortTerm[] Terms;
-
-		public Sorter(string field, bool descending = false)
-		{
-			Terms = new[] { new SortTerm(field, descending) };
-		}
-
-		public Sorter(params SortTerm[] terms)
-		{
-			Terms = terms;
-		}
-	}
-
-	public class SortTerm
-	{
-		public readonly string Field;
-		public readonly bool Descending;
-
-		public SortTerm(string field, bool descending = false)
-		{
-			Field = field;
-			Descending = descending;
-		}
-	}
 }

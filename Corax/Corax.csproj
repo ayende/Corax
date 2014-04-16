@@ -58,6 +58,7 @@
     <Compile Include="Queries\QueryMatch.cs" />
     <Compile Include="Queries\QueryResults.cs" />
     <Compile Include="Queries\Searcher.cs" />
+    <Compile Include="Queries\Sorter.cs" />
     <Compile Include="Queries\TermQuery.cs" />
     <Compile Include="Utils\BufferPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
