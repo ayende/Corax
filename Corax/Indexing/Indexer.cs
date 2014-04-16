@@ -28,8 +28,6 @@ namespace Corax.Indexing
 
 		private readonly Dictionary<string, string> _fieldTreesCache = new Dictionary<string, string>();
 		private readonly List<byte[]> _usedBuffers = new List<byte[]>();
-		private int addedDocsCounts;
-		private int deletedDocsCount;
 
 		public class TermInfo
 		{
@@ -79,14 +77,11 @@ namespace Corax.Indexing
 
 		public void NewIndexEntry()
 		{
-			addedDocsCounts++;
 			SetCurrentIndexEntry(_parent.NextDocumentId());
 		}
 
 		public void DeleteIndexEntry(long id)
 		{
-			deletedDocsCount++;
-
 			var currentDocument = _bufferPool.Take(FullTextIndex.DocumentFieldSize);
 			_usedBuffers.Add(currentDocument);
 
@@ -185,7 +180,6 @@ namespace Corax.Indexing
 				EndianBitConverter.Big.CopyBytes(info.Boost, fieldBuffer, sizeof(long) + sizeof(int));
 				var termSlice = new Slice(term.Buffer, (ushort)term.Size);
 				_writeBatch.MultiAdd(termSlice, new Slice(fieldBuffer), tree);
-
 
 				int fieldCount;
 				countPerFieldName.TryGetValue(field, out fieldCount);
