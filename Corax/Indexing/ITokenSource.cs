@@ -6,8 +6,12 @@ namespace Corax.Indexing
 	{
 		char[] Buffer { get; }
 		int Size { get; set; }
+		
 		int Line { get; }
-		int Pos { get; }
+		int Column { get; }
+
+		int Position { get; set; }
+
 		bool Next();
 
 		void SetReader(TextReader reader);
