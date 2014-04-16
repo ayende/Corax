@@ -48,39 +48,41 @@ namespace Corax.Queries
 		private Comparison<QueryMatch> GenerateComparisonFunction(Sorter sortBy)
 		{
 			if (sortBy == null)
-				return (x, y) => x.CompareTo(y);
+				return (x, y) => x.Score.CompareTo(y.Score);
 
-			int[] fieldNumbers = new int[sortBy.Terms.Length];
+			var fieldNumbers = new int[sortBy.Terms.Length];
 			for (var i = 0; i < sortBy.Terms.Length; i++)
 				fieldNumbers[i] = _index.GetFieldNumber(sortBy.Terms[i].Field);
 
-				return (x, y) =>
+			return (x, y) =>
+			{
+				for (int i = 0; i < sortBy.Terms.Length; i++)
 				{
-					for (int i=0; i<sortBy.Terms.Length; i++)
-					{
-						var term = sortBy.Terms[i];
-						int fieldNumber = fieldNumbers[i];
+					var term = sortBy.Terms[i];
+					int fieldNumber = fieldNumbers[i];
 
-						var xVal = GetTermForDocument(x.DocumentId, fieldNumber);
-						var yVal = GetTermForDocument(y.DocumentId, fieldNumber);
+					var xVal = GetTermForDocument(x.DocumentId, fieldNumber);
+					var yVal = GetTermForDocument(y.DocumentId, fieldNumber);
 
-						if (xVal != null || yVal != null)
-						{
-							var factor = (term.Descending ? 1 : -1);
-							if (xVal == null)
-								return -1*factor;
-							if (yVal == null)
-								return 1*factor;
+					if (xVal == null && yVal == null)
+						continue;
 
-							var result = xVal.CompareTo(yVal) * factor;
+					var factor = (term.Descending ? 1 : -1);
 
-							if (result != 0)
-								return result;
-						}
-					}
+					if (xVal == null)
+						return -1 * factor;
 
-					return 0;
-				};
+					if (yVal == null)
+						return 1 * factor;
+
+					var result = xVal.CompareTo(yVal) * factor;
+
+					if (result != 0)
+						return result;
+				}
+
+				return 0;
+			};
 		}
 
 		public ValueReader GetTermForDocument(long docId, int fieldId)
@@ -144,11 +146,11 @@ namespace Corax.Queries
 
 	public class Sorter
 	{
-		public SortTerm[] Terms;
+		public readonly SortTerm[] Terms;
 
 		public Sorter(string field, bool descending = false)
 		{
-			Terms = new SortTerm[] {new SortTerm(field, descending)};
+			Terms = new[] { new SortTerm(field, descending) };
 		}
 
 		public Sorter(params SortTerm[] terms)
@@ -159,13 +161,13 @@ namespace Corax.Queries
 
 	public class SortTerm
 	{
-		public string Field;
-		public bool Descending;
+		public readonly string Field;
+		public readonly bool Descending;
 
 		public SortTerm(string field, bool descending = false)
 		{
-			this.Field = field;
-			this.Descending = descending;
+			Field = field;
+			Descending = descending;
 		}
 	}
 }
