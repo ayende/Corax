@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,42 +9,52 @@ namespace Corax.Queries
 {
 	public class BooleanQuery : Query
 	{
-		public BooleanQuery(QueryOperator op, Query left, Query right)
+		private readonly Query[] _clasues;
+
+		public BooleanQuery(QueryOperator op, params Query[] clasues)
 		{
+			_clasues = clasues;
 			Op = op;
-			Left = left;
-			Right = right;
 		}
 
 		public QueryOperator Op { get; set; }
-		public Query Left { get; set; }
-		public Query Right { get; set; }
 
 		protected override void Init()
 		{
-			Left.Initialize(Index, Transaction, Score);
-			Right.Initialize(Index, Transaction, Score);
+			foreach (var clasue in _clasues)
+			{
+				clasue.Initialize(Index, Transaction, Score);
+			}
+			Boost = _clasues.Sum(x => x.Boost);
 		}
 
 		public override IEnumerable<QueryMatch> Execute()
 		{
-			var leftResults = Left.Execute();
-			var rightResults = Right.Execute();
-			if (Op == QueryOperator.And)
+			if (_clasues.Length == 0)
+				return Enumerable.Empty<QueryMatch>();
+			var result = _clasues[0].Execute();
+			for (int i = 1; i < _clasues.Length; i++)
 			{
-				return leftResults.Intersect(rightResults, new QueryMatchComparer());
-			} else if (Op == QueryOperator.Or)
-			{
-				return leftResults.Union(rightResults, new QueryMatchComparer());
+				var temp = _clasues[i].Execute();
+				switch (Op)
+				{
+					case QueryOperator.And:
+						result = result.Intersect(temp	, QueryMatchComparer.Instance);
+						break;
+					case QueryOperator.Or:
+						result = result.Union(temp, QueryMatchComparer.Instance);
+						break;
+					default:
+						throw new ArgumentOutOfRangeException("Cannot understand " + Op);
+				}	
 			}
-			else
-			{
-				throw new InvalidOperationException("QueryOperator must be And or Or.");
-			}
+			return result;
 		}
 
 		private class QueryMatchComparer : IEqualityComparer<QueryMatch>
 		{
+			public static readonly QueryMatchComparer Instance = new QueryMatchComparer();
+
 			public bool Equals(QueryMatch x, QueryMatch y)
 			{
 				return x.DocumentId == y.DocumentId;
@@ -51,7 +62,7 @@ namespace Corax.Queries
 
 			public int GetHashCode(QueryMatch match)
 			{
-				return 0; // We're not using the hash, so return a dummy value.
+				return match.DocumentId.GetHashCode();
 			}
 		}
 
