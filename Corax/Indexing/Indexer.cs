@@ -8,6 +8,7 @@ using Corax.Indexing.Filters;
 using Corax.Utils;
 using Voron;
 using Voron.Impl;
+using Voron.Trees;
 using Voron.Util.Conversion;
 
 namespace Corax.Indexing
@@ -91,10 +92,11 @@ namespace Corax.Indexing
 
 			EndianBitConverter.Big.CopyBytes(id, currentDocument, 0);
 
-			_writeBatch.Delete(new Slice(currentDocument, sizeof(long)), "StoredFields");
 			using (var snapshot = _parent.StorageEnvironment.CreateSnapshot())
 			using (var it = snapshot.Iterate("Docs"))
 			{
+				_writeBatch.Delete(new Slice(currentDocument, sizeof(long)), "StoredFields");
+
 				if (it.Seek(new Slice(currentDocument)) == false)
 					return; // not found, nothing to do
 				do
@@ -115,37 +117,43 @@ namespace Corax.Indexing
 
 					_writeBatch.Delete(new Slice(currentDocumentField), "Docs");
 
-					var size = (ushort)it.GetCurrentDataSize();
-
-					var termBuffer = _bufferPool.Take(size);
-					it.CreateReaderForCurrent().Read(termBuffer, 0, size);
-
-					var termSlice = new Slice(termBuffer, size);
-
-					var tree = GetTreeName(fieldId);
-					using (var termIt = snapshot.MultiRead(tree, termSlice))
-					{
-						var currentFieldDocument = _bufferPool.Take(FullTextIndex.FieldDocumentSize);
-						_usedBuffers.Add(currentFieldDocument);
-
-						if (termIt.Seek(new Slice(currentFieldDocument)))
-						{
-							do
-							{
-								termIt.CurrentKey.CopyTo(currentDocumentField);
-
-								if (EndianBitConverter.Big.ToInt64(currentDocument, 0) != id)
-									break;
-
-								var tempBuffer = _bufferPool.Take(termIt.CurrentKey.Size);
-								_usedBuffers.Add(termBuffer);
-								termIt.CurrentKey.CopyTo(tempBuffer);
-								_writeBatch.MultiDelete(termSlice,new Slice(tempBuffer), tree);
-
-							} while (termIt.MoveNext());
-						}
-					}
+					DeleteTermsForIndexEntry(snapshot, it.CreateReaderForCurrent(), id, fieldId);
 				} while (it.MoveNext());
+			}
+		}
+
+		private void DeleteTermsForIndexEntry(SnapshotReader snapshot, ValueReader reader, long id, int fieldId)
+		{
+			var termBuffer = _bufferPool.Take(reader.Length);
+			_usedBuffers.Add(termBuffer);
+			reader.Read(termBuffer, 0, reader.Length);
+			var termSlice = new Slice(termBuffer, (ushort) reader.Length);
+
+			var tree = GetTreeName(fieldId);
+			using (var termIt = snapshot.MultiRead(tree, termSlice))
+			{
+				var currentFieldDocument = _bufferPool.Take(FullTextIndex.FieldDocumentSize);
+				try
+				{
+					if (termIt.Seek(new Slice(currentFieldDocument)) == false)
+						return;
+					do
+					{
+						termIt.CurrentKey.CopyTo(currentFieldDocument);
+
+						if (EndianBitConverter.Big.ToInt64(currentFieldDocument, 0) != id)
+							break;
+
+						var valueBuffer = _bufferPool.Take(termIt.CurrentKey.Size);
+						_usedBuffers.Add(valueBuffer);
+						termIt.CurrentKey.CopyTo(valueBuffer);
+						_writeBatch.MultiDelete(termSlice, new Slice(valueBuffer), tree);
+					} while (termIt.MoveNext());
+				}
+				finally
+				{
+					_bufferPool.Return(currentFieldDocument);
+				}
 			}
 		}
 
