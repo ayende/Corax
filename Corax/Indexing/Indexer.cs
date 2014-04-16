@@ -28,13 +28,13 @@ namespace Corax.Indexing
 
 		private readonly Dictionary<string, string> _fieldTreesCache = new Dictionary<string, string>();
 		private readonly List<byte[]> _usedBuffers = new List<byte[]>();
-		private int addedDocsCounts;
-		private int deletedDocsCount;
 
 		public class TermInfo
 		{
 			public int Freq;
 			public float Boost;
+
+			public List<int> Positions;
 		}
 
 		private int _currentTermCount;
@@ -79,14 +79,11 @@ namespace Corax.Indexing
 
 		public void NewIndexEntry()
 		{
-			addedDocsCounts++;
 			SetCurrentIndexEntry(_parent.NextDocumentId());
 		}
 
 		public void DeleteIndexEntry(long id)
 		{
-			deletedDocsCount++;
-
 			var currentDocument = _bufferPool.Take(FullTextIndex.DocumentFieldSize);
 			_usedBuffers.Add(currentDocument);
 
@@ -181,11 +178,10 @@ namespace Corax.Indexing
 				var info = kvp.Value;
 				var fieldBuffer = new byte[FullTextIndex.FieldDocumentSize];
 				Buffer.BlockCopy(docBuffer, 0, fieldBuffer, 0, sizeof (long));
-				EndianBitConverter.Big.CopyBytes(info.Freq, fieldBuffer, sizeof(long));
-				EndianBitConverter.Big.CopyBytes(info.Boost, fieldBuffer, sizeof(long) + sizeof(int));
-				var termSlice = new Slice(term.Buffer, (ushort)term.Size);
+				EndianBitConverter.Big.CopyBytes(info.Freq, fieldBuffer, sizeof (long));
+				EndianBitConverter.Big.CopyBytes(info.Boost, fieldBuffer, sizeof (long) + sizeof (int));
+				var termSlice = new Slice(term.Buffer, (ushort) term.Size);
 				_writeBatch.MultiAdd(termSlice, new Slice(fieldBuffer), tree);
-
 
 				int fieldCount;
 				countPerFieldName.TryGetValue(field, out fieldCount);
@@ -194,9 +190,9 @@ namespace Corax.Indexing
 
 				var documentBuffer = _bufferPool.Take(FullTextIndex.DocumentFieldSize);
 				_usedBuffers.Add(documentBuffer);
-				Buffer.BlockCopy(docBuffer, 0, documentBuffer, 0, sizeof(long));
-				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), documentBuffer, sizeof(long));
-				EndianBitConverter.Big.CopyBytes(fieldCount, documentBuffer, sizeof(long) + sizeof(int));
+				Buffer.BlockCopy(docBuffer, 0, documentBuffer, 0, sizeof (long));
+				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), documentBuffer, sizeof (long));
+				EndianBitConverter.Big.CopyBytes(fieldCount, documentBuffer, sizeof (long) + sizeof (int));
 				_writeBatch.Add(new Slice(documentBuffer), termSlice, "Docs");
 			}
 
@@ -287,6 +283,13 @@ namespace Corax.Indexing
 				}
 
 				info.Freq++;
+
+				if (options.HasFlag(FieldOptions.TermPositions))
+				{
+					if (info.Positions == null)
+						info.Positions = new List<int>();
+					info.Positions.Add(_source.Position);
+				}
 			}
 		}
 

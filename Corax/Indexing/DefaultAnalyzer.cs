@@ -11,10 +11,11 @@ namespace Corax.Indexing
 			new StopWordsFilter(), 
 		};
 
-
 		public ITokenSource CreateTokenSource(string field, ITokenSource existing)
 		{
-			return existing ?? new StringTokenizer();
+			var tokenSource = existing ?? new StringTokenizer();
+			tokenSource.Position = 0;
+			return tokenSource;
 		}
 
 		public bool Process(string field, ITokenSource source)

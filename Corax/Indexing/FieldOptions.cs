@@ -8,6 +8,7 @@ namespace Corax.Indexing
 	public enum FieldOptions
 	{
 		None = 0,
-		NoAnalyzer = 4,
+		NoAnalyzer = 1,
+		TermPositions = 2,
 	}
 }

@@ -25,7 +25,8 @@ namespace Corax.Indexing
 
 		public int Line { get; private set; }
 
-		public int Pos { get; private set; }
+		public int Column { get; private set; }
+		public int Position { get; set; }
 
 		private bool BufferFull
 		{
@@ -35,12 +36,13 @@ namespace Corax.Indexing
 		public bool Next()
 		{
 			Size = 0;
+			Position++;
 			char curr = '\0';
 			while (true)
 			{
 				char prev = curr;
 				int r = _reader.Read();
-				Pos++;
+				Column++;
 				if (r == -1) // EOF
 				{
 					if (_quoted && Size > 0)
@@ -56,7 +58,7 @@ namespace Corax.Indexing
 				curr = (char) r;
 				if (curr == '\r' || curr == '\n')
 				{
-					Pos = 0;
+					Column = 0;
 					if (prev != '\r' || curr != '\n')
 					{
 						Line++; // only move to new line if it isn't the \n in a \r\n pair
