@@ -54,7 +54,7 @@ namespace Corax.Indexing
 
 		public void UpdateIndexEntry(long id)
 		{
-			DeleteDocument(id);
+			DeleteIndexEntry(id);
 			SetCurrentIndexEntry(id);
 		}
 
@@ -82,7 +82,7 @@ namespace Corax.Indexing
 			SetCurrentIndexEntry(_parent.NextDocumentId());
 		}
 
-		public void DeleteDocument(long id)
+		public void DeleteIndexEntry(long id)
 		{
 			deletedDocsCount++;
 

@@ -171,7 +171,7 @@ namespace Corax.Tests
 
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
-					indexer.DeleteDocument(1);
+					indexer.DeleteIndexEntry(1);
 
 					indexer.Flush();
 				}
@@ -184,7 +184,7 @@ namespace Corax.Tests
 
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
-					indexer.DeleteDocument(2);
+					indexer.DeleteIndexEntry(2);
 
 					indexer.Flush();
 				}
