@@ -9,5 +9,6 @@ namespace Corax.Indexing
 	{
 		None = 0,
 		NoAnalyzer = 1,
+		TermPositions = 2,
 	}
 }
