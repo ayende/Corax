@@ -14,7 +14,7 @@ namespace Corax.Tests
 		{
 			using (new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
 			{
-				
+
 			}
 		}
 
@@ -25,7 +25,7 @@ namespace Corax.Tests
 			{
 				using (fti.CreateIndexer())
 				{
-					
+
 				}
 			}
 		}
@@ -193,6 +193,40 @@ namespace Corax.Tests
 			}
 		}
 
+		[Fact]
+		public void CanQueryUsingBooleanQuery()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.NewIndexEntry();
+
+					indexer.AddField("Name", "Oren");
+
+					indexer.AddField("Email", "ayende@ayende.com");
+
+					indexer.NewIndexEntry();
+
+					indexer.AddField("Name", "Oren");
+
+					indexer.AddField("Email", "oren@ayende.com");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					Assert.Equal(1, searcher.Query(new BooleanQuery(QueryOperator.And,
+						new TermQuery("Name", "oren"),
+						new TermQuery("Email", "ayende@ayende.com"))).Count());
+
+					Assert.Equal(2, searcher.Query(new BooleanQuery(QueryOperator.Or,
+						new TermQuery("Name", "oren"),
+						new TermQuery("Email", "ayende@ayende.com"))).Count());
+				}
+			}
+		}
 
 		[Fact]
 		public void CanDelete()
@@ -287,7 +321,6 @@ namespace Corax.Tests
 			}
 		}
 
-
 		[Fact]
 		public void CanQueryUsingMissingTerm()
 		{
@@ -308,7 +341,6 @@ namespace Corax.Tests
 				}
 			}
 		}
-
 
 		[Fact]
 		public void CanQueryUsingMissingField()
@@ -342,6 +374,6 @@ namespace Corax.Tests
 					Assert.Empty(searcher.Query(new TermQuery("Foo", "Arava")));
 				}
 			}
-		} 
+		}
 	}
 }

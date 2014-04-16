@@ -54,6 +54,7 @@
     <Compile Include="Indexing\FieldOptions.cs" />
     <Compile Include="Indexing\Filters\LowerCaseFilter.cs" />
     <Compile Include="Indexing\ITokenSource.cs" />
+    <Compile Include="Queries\BooleanQuery.cs" />
     <Compile Include="Queries\Query.cs" />
     <Compile Include="Queries\QueryMatch.cs" />
     <Compile Include="Queries\QueryResults.cs" />
