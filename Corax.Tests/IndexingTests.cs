@@ -36,7 +36,7 @@ namespace Corax.Tests
 			{
 				using (var indexer = fti.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 					indexer.Flush();
 				}
 			}
@@ -49,7 +49,7 @@ namespace Corax.Tests
 			{
 				using (var indexer = fti.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Oren Eini");
 
@@ -65,7 +65,7 @@ namespace Corax.Tests
 			{
 				using (var indexer = fti.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Oren and Ayende");
 
@@ -86,13 +86,17 @@ namespace Corax.Tests
 			{
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Oren Eini");
 
-					indexer.NewDocument();
+					indexer.AddField("Email", "ayende@ayende.com");
 
-					indexer.AddField("Name", "Ayende Rahien");
+					indexer.NewIndexEntry();
+
+					indexer.AddField("Name", "Arava Eini");
+
+					indexer.AddField("Email", "arava@houseof.dog");
 
 					indexer.Flush();
 				}
@@ -113,11 +117,11 @@ namespace Corax.Tests
 			{
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Oren Eini");
 
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Ayende Rahien");
 
@@ -166,7 +170,7 @@ namespace Corax.Tests
 			{
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
-					indexer.NewDocument(); // doc 1
+					indexer.NewIndexEntry(); // doc 1
 
 					Assert.Equal(1L, indexer.CurrentDocumentId);
 
@@ -182,7 +186,7 @@ namespace Corax.Tests
 
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
-					indexer.UpdateDocument(1); // doc 1
+					indexer.UpdateIndexEntry(1); // doc 1
 
 					Assert.Equal(1L, indexer.CurrentDocumentId);
 
@@ -207,7 +211,7 @@ namespace Corax.Tests
 			{
 				using (var indexer = fti.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Oren Eini");
 
@@ -229,7 +233,7 @@ namespace Corax.Tests
 			{
 				using (var indexer = fti.CreateIndexer())
 				{
-					indexer.NewDocument();
+					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Oren Eini");
 

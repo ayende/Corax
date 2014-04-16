@@ -25,11 +25,11 @@ namespace Corax.Queries
 
 		protected override void Init()
 		{
-			_fieldTree = Transaction.ReadTree("@" + _field);
+			_fieldTree = Transaction.ReadTree("@fld_" + _field);
 			if (_fieldTree == null)
 				return;
 			var termFreqInDocs = _fieldTree.State.EntriesCount;
-			var numberOfDocs = Transaction.ReadTree("Documents").State.EntriesCount;
+			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();
 
 			var idf = Index.Conventions.Idf(termFreqInDocs, numberOfDocs);
 			_weight = idf*idf; // square it

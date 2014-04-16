@@ -7,8 +7,8 @@ namespace Corax.Indexing.Filters
 		private static readonly string[] defaultStopWords =
 		{
 			"a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
-			"if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there",
-			"these", "they", "this", "to", "was", "will", "with"
+			"if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the", 
+			"their", "then", "there", "these", "they", "this", "to", "was", "will", "with"
 		};
 
 		private readonly HashSet<ArraySegmentKey<char>> _stopWords = new HashSet<ArraySegmentKey<char>>();

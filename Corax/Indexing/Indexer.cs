@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
 using Corax.Indexing.Filters;
 using Corax.Utils;
 using Voron;
@@ -22,6 +23,13 @@ namespace Corax.Indexing
 		private readonly Dictionary<Tuple<string, ArraySegmentKey<byte>>, TermInfo> _currentTerms =
 			new Dictionary<Tuple<string, ArraySegmentKey<byte>>, TermInfo>();
 
+		private readonly BufferPool _bufferPool;
+
+		private readonly Dictionary<string, string> _fieldTreesCache = new Dictionary<string, string>();
+		private readonly List<byte[]> _usedBuffers = new List<byte[]>();
+		private int addedDocsCounts;
+		private int deletedDocsCount;
+
 		public class TermInfo
 		{
 			public int Freq;
@@ -40,22 +48,16 @@ namespace Corax.Indexing
 			AutoFlush = true;
 		}
 
-		private readonly BufferPool _bufferPool;
-
-		private readonly Dictionary<string, string> _fieldTreesCache = new Dictionary<string, string>();
-		private readonly List<byte[]> _usedBuffers = new List<byte[]>();
-
 		public long CurrentDocumentId { get; private set; }
 
 		public bool AutoFlush { get; set; }
 
-		public void UpdateDocument(long id)
+		public void UpdateIndexEntry(long id)
 		{
-			
-			SetCurrentDocument(id);
+			SetCurrentIndexEntry(id);
 		}
 
-		private void SetCurrentDocument(long id)
+		private void SetCurrentIndexEntry(long id)
 		{
 			if (CurrentDocumentId > 0)
 			{
@@ -73,13 +75,15 @@ namespace Corax.Indexing
 			_binaryWriter.SetOutput(_documentFields);
 		}
 
-		public void NewDocument()
+		public void NewIndexEntry()
 		{
-			SetCurrentDocument(_parent.NextDocumentId());
+			addedDocsCounts++;
+			SetCurrentIndexEntry(_parent.NextDocumentId());
 		}
 
 		public void DeleteDocument(long id)
 		{
+			deletedDocsCount++;
 		}
 
 		private void FlushCurrentDocument()
@@ -90,31 +94,52 @@ namespace Corax.Indexing
 
 			var docBuffer = _bufferPool.Take(sizeof (long));
 			EndianBitConverter.Big.CopyBytes(CurrentDocumentId, docBuffer, 0);
-			_writeBatch.Add(new Slice(docBuffer), _documentFields, "Documents");
+			_writeBatch.Add(new Slice(docBuffer), _documentFields, "StoredFields");
 			_usedBuffers.Add(docBuffer);
-		
-			const int size = sizeof(long) // document id
-			                 + sizeof(int) // term freq in doc
-			                 + sizeof(float); // boost val
 
+			const int fieldDocumentSize =
+				sizeof (long) +  // document id
+				sizeof (int) + // term freq in doc
+				sizeof (float); // boost val
+
+			const int documentFieldSize = 
+				sizeof(long) + // document id
+				sizeof(int) + // field id
+				sizeof(ushort); // field value counter
+
+			var countPerFieldName = new Dictionary<string, ushort>();
 			foreach (var kvp in _currentTerms)
 			{
 				var field = kvp.Key.Item1;
 				string tree;
 				if (_fieldTreesCache.TryGetValue(field, out tree) == false)
 				{
-					tree = "@" + field;
+					tree = "@fld_" + field;
 					_fieldTreesCache[field] = tree;
 				}
 				var term = kvp.Key.Item2;
 				var info = kvp.Value;
-				var valBuffer = _bufferPool.Take(size);
-				_usedBuffers.Add(valBuffer);
-				Buffer.BlockCopy(docBuffer, 0, valBuffer, 0, sizeof (long));
-				EndianBitConverter.Big.CopyBytes(info.Freq, valBuffer, sizeof(long));
-				EndianBitConverter.Big.CopyBytes(info.Boost, valBuffer, sizeof(long) + sizeof(int));
+				var fieldBuffer = new byte[fieldDocumentSize];
+				Buffer.BlockCopy(docBuffer, 0, fieldBuffer, 0, sizeof (long));
+				EndianBitConverter.Big.CopyBytes(info.Freq, fieldBuffer, sizeof(long));
+				EndianBitConverter.Big.CopyBytes(info.Boost, fieldBuffer, sizeof(long) + sizeof(int));
+				var termSlice = new Slice(term.Buffer, (ushort)term.Size);
+				_writeBatch.MultiAdd(termSlice, new Slice(fieldBuffer), tree);
 
-				_writeBatch.MultiAdd(new Slice(term.Buffer, (ushort)term.Size), new Slice(valBuffer), tree);
+
+				ushort fieldCount;
+				countPerFieldName.TryGetValue(field, out fieldCount);
+				fieldCount += 1;
+				if (fieldCount == ushort.MaxValue)
+					throw new InvalidOperationException("Too many terms for field " + field);
+
+				countPerFieldName[field] = fieldCount;
+
+				var documentBeffer = new byte[documentFieldSize];
+				Buffer.BlockCopy(docBuffer, 0, documentBeffer, 0, sizeof(long));
+				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), fieldBuffer, sizeof(long));
+				EndianBitConverter.Big.CopyBytes(fieldCount, fieldBuffer, sizeof(long) + sizeof(int));
+				_writeBatch.Add(new Slice(documentBeffer), termSlice, "@docs");
 			}
 
 			_currentTerms.Clear();
@@ -127,6 +152,7 @@ namespace Corax.Indexing
 		{
 			FlushCurrentDocument();
 			_parent.StorageEnvironment.Writer.Write(_writeBatch);
+			Interlocked.Add(ref _parent.NumberOfDocuments, addedDocsCounts - deletedDocsCount);
 			_writeBatch = new WriteBatch();
 			foreach (var usedBuffer in _usedBuffers)
 			{

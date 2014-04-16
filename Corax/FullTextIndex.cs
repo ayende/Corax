@@ -6,6 +6,7 @@ using Corax.Queries;
 using Corax.Utils;
 using Voron;
 using Voron.Impl;
+using Voron.Util.Conversion;
 
 namespace Corax
 {
@@ -20,6 +21,7 @@ namespace Corax
 		public StorageEnvironment StorageEnvironment { get; private set; }
 
 		private readonly ConcurrentDictionary<string, int> _fieldsIds = new ConcurrentDictionary<string, int>();
+		internal long NumberOfDocuments;
 
 		public IndexingConventions Conventions { get; private set; }
 
@@ -54,7 +56,7 @@ namespace Corax
 				_lastFieldId++;
 
 				var wb = new WriteBatch();
-				wb.Add(field, BitConverter.GetBytes(_lastFieldId), "Fields");
+				wb.Add(field, new Slice(BitConverter.GetBytes(_lastFieldId)), "FieldNames");
 				StorageEnvironment.Writer.Write(wb);
 
 				_fieldsIds.TryAdd(field, _lastFieldId);
@@ -71,16 +73,18 @@ namespace Corax
 			{
 				Id = Guid.NewGuid();
 				metadata.Add(tx, "id", Id.ToByteArray());
+				metadata.Add(tx, "docs", BitConverter.GetBytes(0L));
 			}
 			else
 			{
 				Id = new Guid(idVal.Reader.ReadBytes(16));
+				NumberOfDocuments = metadata.Read(tx, "docs").Reader.ReadInt64();
 			}
 		}
 
 		private void ReadFields(Transaction tx)
 		{
-			var fields = StorageEnvironment.CreateTree(tx, "Fields");
+			var fields = StorageEnvironment.CreateTree(tx, "FieldNames");
 			using (var it = fields.Iterate(tx))
 			{
 				if (it.Seek(Slice.BeforeAllKeys))
@@ -98,10 +102,17 @@ namespace Corax
 
 		private void ReadLastDocumentId(Transaction tx)
 		{
-			var docs = StorageEnvironment.CreateTree(tx, "Documents");
+			var docs = StorageEnvironment.CreateTree(tx, "@docs");
 			using (var it = docs.Iterate(tx))
 			{
-				_lastDocumentId = it.Seek(Slice.AfterAllKeys) == false ? 0 : it.CurrentKey.ToInt64();
+				if (it.Seek(Slice.AfterAllKeys) == false)
+				{
+					_lastDocumentId = 0;
+					return;
+				}
+				var buffer = new byte[12];
+				it.CurrentKey.CopyTo(buffer);
+				_lastDocumentId = EndianBitConverter.Big.ToInt64(buffer, 0);
 			}
 		}
 
