@@ -18,7 +18,9 @@ namespace Corax.Queries
 			_tx = _index.StorageEnvironment.NewTransaction(TransactionFlags.Read);
 		}
 
-		public QueryResults QueryTop(Query query, int take, IndexingConventions.ScorerCalc score = null)
+		public QueryResults QueryTop(Query query, int take, 
+			IndexingConventions.ScorerCalc score = null,
+			Sorter sortBy = null)
 		{
 			if (take < 0)
 				throw new ArgumentException("Take must be non negative");
@@ -68,5 +70,11 @@ namespace Corax.Queries
 		{
 			_tx.Dispose();
 		}
+	}
+
+	public class Sorter
+	{
+		public string Field;
+		public bool Descending;
 	}
 }

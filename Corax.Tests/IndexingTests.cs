@@ -109,6 +109,41 @@ namespace Corax.Tests
 			}
 		}
 
+		[Fact]
+		public void CanQueryAndSort()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.NewIndexEntry();
+
+					indexer.AddField("Name", "Oren Eini");
+
+					indexer.AddField("Email", "ayende@ayende.com");
+
+					indexer.NewIndexEntry();
+
+					indexer.AddField("Name", "Arava Eini");
+
+					indexer.AddField("Email", "arava@houseof.dog");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					var results = searcher.QueryTop(new TermQuery("Name", "eini"), 5, sortBy: new Sorter
+					{
+						Field = "Email"
+					});
+
+					Assert.Equal(2, results.Results[0].DocumentId);
+					Assert.Equal(1, results.Results[1].DocumentId);
+				}
+			}
+		}
+
 
 		[Fact]
 		public void CanDelete()
