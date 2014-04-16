@@ -42,7 +42,7 @@ namespace Corax.Indexing.Filters
 
 			for (int i = 0; i < _size; i++)
 			{
-				if (_buffer[i].Equals(other._buffer[i]))
+				if (_buffer[i].Equals(other._buffer[i]) == false)
 					return false;
 			}
 			return true;

@@ -104,7 +104,7 @@ namespace Corax.Tests
 				using (var searcher = fullTextIndex.CreateSearcher())
 				{
 					Assert.Equal(1, searcher.Query(new TermQuery("Name", "oren")).Count());
-					Assert.Equal(1, searcher.Query(new TermQuery("Name", "rahien")).Count());
+					Assert.Equal(0, searcher.Query(new TermQuery("Name", "rahien")).Count());
 				}
 			}
 		}

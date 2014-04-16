@@ -54,6 +54,7 @@ namespace Corax.Indexing
 
 		public void UpdateIndexEntry(long id)
 		{
+			DeleteDocument(id);
 			SetCurrentIndexEntry(id);
 		}
 
@@ -84,6 +85,68 @@ namespace Corax.Indexing
 		public void DeleteDocument(long id)
 		{
 			deletedDocsCount++;
+
+			var currentDocument = _bufferPool.Take(FullTextIndex.DocumentFieldSize);
+			_usedBuffers.Add(currentDocument);
+
+			EndianBitConverter.Big.CopyBytes(id, currentDocument, 0);
+
+			_writeBatch.Delete(new Slice(currentDocument, sizeof(long)), "StoredFields");
+			using (var snapshot = _parent.StorageEnvironment.CreateSnapshot())
+			using (var it = snapshot.Iterate("Docs"))
+			{
+				if (it.Seek(new Slice(currentDocument)) == false)
+					return; // not found, nothing to do
+				do
+				{
+					var currentDocumentField = _bufferPool.Take(FullTextIndex.DocumentFieldSize);
+					it.CurrentKey.CopyTo(currentDocumentField);
+
+					var docId = EndianBitConverter.Big.ToInt64(currentDocumentField, 0);
+					if (docId != id)
+					{
+						_bufferPool.Return(currentDocumentField);
+						break;
+					}
+
+					_usedBuffers.Add(currentDocumentField);
+
+					var fieldId = EndianBitConverter.Big.ToInt32(currentDocumentField, sizeof(long));
+
+					_writeBatch.Delete(new Slice(currentDocumentField), "Docs");
+
+					var size = (ushort)it.GetCurrentDataSize();
+
+					var termBuffer = _bufferPool.Take(size);
+					it.CreateReaderForCurrent().Read(termBuffer, 0, size);
+
+					var termSlice = new Slice(termBuffer, size);
+
+					var tree = GetTreeName(fieldId);
+					using (var termIt = snapshot.MultiRead(tree, termSlice))
+					{
+						var currentFieldDocument = _bufferPool.Take(FullTextIndex.FieldDocumentSize);
+						_usedBuffers.Add(currentFieldDocument);
+
+						if (termIt.Seek(new Slice(currentFieldDocument)))
+						{
+							do
+							{
+								termIt.CurrentKey.CopyTo(currentDocumentField);
+
+								if (EndianBitConverter.Big.ToInt64(currentDocument, 0) != id)
+									break;
+
+								var tempBuffer = _bufferPool.Take(termIt.CurrentKey.Size);
+								_usedBuffers.Add(termBuffer);
+								termIt.CurrentKey.CopyTo(tempBuffer);
+								_writeBatch.MultiDelete(termSlice,new Slice(tempBuffer), tree);
+
+							} while (termIt.MoveNext());
+						}
+					}
+				} while (it.MoveNext());
+			}
 		}
 
 		private void FlushCurrentDocument()
@@ -100,29 +163,15 @@ namespace Corax.Indexing
 				_documentFields.Position = 0;
 				_writeBatch.Add(new Slice(docBuffer), _documentFields, "StoredFields");
 			}
-			const int fieldDocumentSize =
-				sizeof (long) +  // document id
-				sizeof (int) + // term freq in doc
-				sizeof (float); // boost val
-
-			const int documentFieldSize = 
-				sizeof(long) + // document id
-				sizeof(int) + // field id
-				sizeof(int); // field value counter
 
 			var countPerFieldName = new Dictionary<string, int>();
 			foreach (var kvp in _currentTerms)
 			{
 				var field = kvp.Key.Item1;
-				string tree;
-				if (_fieldTreesCache.TryGetValue(field, out tree) == false)
-				{
-					tree = "@fld_" + field;
-					_fieldTreesCache[field] = tree;
-				}
+				var tree = GetTreeName(field);
 				var term = kvp.Key.Item2;
 				var info = kvp.Value;
-				var fieldBuffer = new byte[fieldDocumentSize];
+				var fieldBuffer = new byte[FullTextIndex.FieldDocumentSize];
 				Buffer.BlockCopy(docBuffer, 0, fieldBuffer, 0, sizeof (long));
 				EndianBitConverter.Big.CopyBytes(info.Freq, fieldBuffer, sizeof(long));
 				EndianBitConverter.Big.CopyBytes(info.Boost, fieldBuffer, sizeof(long) + sizeof(int));
@@ -135,10 +184,11 @@ namespace Corax.Indexing
 				fieldCount += 1;
 				countPerFieldName[field] = fieldCount;
 
-				var documentBuffer = new byte[documentFieldSize];
+				var documentBuffer = _bufferPool.Take(FullTextIndex.DocumentFieldSize);
+				_usedBuffers.Add(documentBuffer);
 				Buffer.BlockCopy(docBuffer, 0, documentBuffer, 0, sizeof(long));
-				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), fieldBuffer, sizeof(long));
-				EndianBitConverter.Big.CopyBytes(fieldCount, fieldBuffer, sizeof(long) + sizeof(int));
+				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), documentBuffer, sizeof(long));
+				EndianBitConverter.Big.CopyBytes(fieldCount, documentBuffer, sizeof(long) + sizeof(int));
 				_writeBatch.Add(new Slice(documentBuffer), termSlice, "Docs");
 			}
 
@@ -148,11 +198,27 @@ namespace Corax.Indexing
 			CurrentDocumentId = -1;
 		}
 
+		private string GetTreeName(int fieldId)
+		{
+			return GetTreeName(_parent.GetFieldName(fieldId));
+		}
+
+		private string GetTreeName(string field)
+		{
+			string tree;
+			if (_fieldTreesCache.TryGetValue(field, out tree) == false)
+			{
+				tree = "@fld_" + field;
+				_fieldTreesCache[field] = tree;
+			}
+			return tree;
+		}
+
 		public void Flush()
 		{
 			FlushCurrentDocument();
 			_parent.StorageEnvironment.Writer.Write(_writeBatch);
-			Interlocked.Add(ref _parent.NumberOfDocuments, addedDocsCounts - deletedDocsCount);
+			
 			_writeBatch = new WriteBatch();
 			foreach (var usedBuffer in _usedBuffers)
 			{

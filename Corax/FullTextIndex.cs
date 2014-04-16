@@ -12,6 +12,16 @@ namespace Corax
 {
 	public class FullTextIndex : IDisposable
 	{
+		internal const int FieldDocumentSize =
+					sizeof(long) +  // document id
+					sizeof(int) + // term freq in doc
+					sizeof(float); // boost val
+
+		internal const int DocumentFieldSize =
+			sizeof(long) + // document id
+			sizeof(int) + // field id
+			sizeof(int); // field value counter
+
 		private long _lastDocumentId;
 		private int _lastFieldId;
 
@@ -20,8 +30,8 @@ namespace Corax
 		public BufferPool BufferPool { get; private set; }
 		public StorageEnvironment StorageEnvironment { get; private set; }
 
-		private readonly ConcurrentDictionary<string, int> _fieldsIds = new ConcurrentDictionary<string, int>();
-		internal long NumberOfDocuments;
+		private readonly ConcurrentDictionary<string, int> _fieldsNamesToIds = new ConcurrentDictionary<string, int>();
+		private readonly ConcurrentDictionary<int, string> _fieldIdsToName = new ConcurrentDictionary<int, string>();
 
 		public IndexingConventions Conventions { get; private set; }
 
@@ -42,15 +52,23 @@ namespace Corax
 			}
 		}
 
+
+		public string GetFieldName(int fieldId)
+		{
+			string value;
+			_fieldIdsToName.TryGetValue(fieldId, out value);
+			return value;
+		}
+
 		public int GetFieldNumber(string field)
 		{
 			int num;
-			if (_fieldsIds.TryGetValue(field, out num))
+			if (_fieldsNamesToIds.TryGetValue(field, out num))
 				return num;
 
-			lock (_fieldsIds)
+			lock (_fieldsNamesToIds)
 			{
-				if (_fieldsIds.TryGetValue(field, out num))
+				if (_fieldsNamesToIds.TryGetValue(field, out num))
 					return num;
 
 				_lastFieldId++;
@@ -59,7 +77,8 @@ namespace Corax
 				wb.Add(field, new Slice(BitConverter.GetBytes(_lastFieldId)), "FieldNames");
 				StorageEnvironment.Writer.Write(wb);
 
-				_fieldsIds.TryAdd(field, _lastFieldId);
+				_fieldIdsToName.TryAdd(_lastFieldId, field);
+				_fieldsNamesToIds.TryAdd(field, _lastFieldId);
 
 				return _lastFieldId;
 			}
@@ -82,6 +101,8 @@ namespace Corax
 			}
 		}
 
+		public long NumberOfDocuments { get; set; }
+
 		private void ReadFields(Transaction tx)
 		{
 			var fields = StorageEnvironment.CreateTree(tx, "FieldNames");
@@ -93,7 +114,8 @@ namespace Corax
 					{
 						var field = it.CurrentKey.ToString();
 						var id = it.CreateReaderForCurrent().ReadInt32();
-						_fieldsIds.TryAdd(field, id);
+						_fieldsNamesToIds.TryAdd(field, id);
+						_fieldIdsToName.TryAdd(id, field);
 						_lastFieldId = Math.Max(_lastFieldId, id);
 					} while (it.MoveNext());
 				}
@@ -110,7 +132,7 @@ namespace Corax
 					_lastDocumentId = 0;
 					return;
 				}
-				var buffer = new byte[16];
+				var buffer = new byte[DocumentFieldSize];
 				it.CurrentKey.CopyTo(buffer);
 				_lastDocumentId = EndianBitConverter.Big.ToInt64(buffer, 0);
 			}
@@ -136,5 +158,6 @@ namespace Corax
 			if (StorageEnvironment != null)
 				StorageEnvironment.Dispose();
 		}
+
 	}
 }
