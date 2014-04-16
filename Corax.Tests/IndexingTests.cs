@@ -193,6 +193,42 @@ namespace Corax.Tests
 			}
 		}
 
+		[Fact]
+		public void CanQueryWithInQuery()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+
+					indexer.NewIndexEntry();
+					indexer.AddField("Name", "David Boike");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("Name", "Oren Eini");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("Name", "Arava Eini");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("Name", "Sean Epping");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("Name", "Joe DeCock");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					var results = searcher.QueryTop(new InQuery("Name", "joe", "epping", "boike"), 5);
+
+					Assert.Equal(3, results.Results.Length);
+					Console.WriteLine("{0}, {1}, {2}", results.Results[0].DocumentId, results.Results[1].DocumentId,
+						results.Results[2].DocumentId);
+				}
+			}
+		}
 
 		[Fact]
 		public void CanDelete()
