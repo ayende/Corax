@@ -90,13 +90,16 @@ namespace Corax.Indexing
 		{
 			if (CurrentDocumentId <= 0)
 				return;
-			_documentFields.Position = 0;
 
-			var docBuffer = _bufferPool.Take(sizeof (long));
+			var docBuffer = _bufferPool.Take(sizeof(long));
 			EndianBitConverter.Big.CopyBytes(CurrentDocumentId, docBuffer, 0);
-			_writeBatch.Add(new Slice(docBuffer), _documentFields, "StoredFields");
 			_usedBuffers.Add(docBuffer);
-
+			
+			if (_documentFields.Position != 0) // don't write if we don't have stored fields
+			{
+				_documentFields.Position = 0;
+				_writeBatch.Add(new Slice(docBuffer), _documentFields, "StoredFields");
+			}
 			const int fieldDocumentSize =
 				sizeof (long) +  // document id
 				sizeof (int) + // term freq in doc
@@ -105,9 +108,9 @@ namespace Corax.Indexing
 			const int documentFieldSize = 
 				sizeof(long) + // document id
 				sizeof(int) + // field id
-				sizeof(ushort); // field value counter
+				sizeof(int); // field value counter
 
-			var countPerFieldName = new Dictionary<string, ushort>();
+			var countPerFieldName = new Dictionary<string, int>();
 			foreach (var kvp in _currentTerms)
 			{
 				var field = kvp.Key.Item1;
@@ -127,19 +130,16 @@ namespace Corax.Indexing
 				_writeBatch.MultiAdd(termSlice, new Slice(fieldBuffer), tree);
 
 
-				ushort fieldCount;
+				int fieldCount;
 				countPerFieldName.TryGetValue(field, out fieldCount);
 				fieldCount += 1;
-				if (fieldCount == ushort.MaxValue)
-					throw new InvalidOperationException("Too many terms for field " + field);
-
 				countPerFieldName[field] = fieldCount;
 
-				var documentBeffer = new byte[documentFieldSize];
-				Buffer.BlockCopy(docBuffer, 0, documentBeffer, 0, sizeof(long));
+				var documentBuffer = new byte[documentFieldSize];
+				Buffer.BlockCopy(docBuffer, 0, documentBuffer, 0, sizeof(long));
 				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), fieldBuffer, sizeof(long));
 				EndianBitConverter.Big.CopyBytes(fieldCount, fieldBuffer, sizeof(long) + sizeof(int));
-				_writeBatch.Add(new Slice(documentBeffer), termSlice, "@docs");
+				_writeBatch.Add(new Slice(documentBuffer), termSlice, "Docs");
 			}
 
 			_currentTerms.Clear();

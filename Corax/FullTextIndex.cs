@@ -102,7 +102,7 @@ namespace Corax
 
 		private void ReadLastDocumentId(Transaction tx)
 		{
-			var docs = StorageEnvironment.CreateTree(tx, "@docs");
+			var docs = StorageEnvironment.CreateTree(tx, "Docs");
 			using (var it = docs.Iterate(tx))
 			{
 				if (it.Seek(Slice.AfterAllKeys) == false)
@@ -110,7 +110,7 @@ namespace Corax
 					_lastDocumentId = 0;
 					return;
 				}
-				var buffer = new byte[12];
+				var buffer = new byte[16];
 				it.CurrentKey.CopyTo(buffer);
 				_lastDocumentId = EndianBitConverter.Big.ToInt64(buffer, 0);
 			}
