@@ -6,7 +6,6 @@ namespace Corax.Queries
 {
 	public abstract class Query
 	{
-
 		protected FullTextIndex Index;
 		protected Transaction Transaction;
 		protected IndexingConventions.ScorerCalc Score;
@@ -18,7 +17,7 @@ namespace Corax.Queries
 			Boost = 1.0f;
 		}
 		
-		public void Initialize(FullTextIndex index, Transaction tx,  IndexingConventions.ScorerCalc score)
+		public void Initialize(FullTextIndex index, Transaction tx, IndexingConventions.ScorerCalc score)
 		{
 			Index = index;
 			Transaction = tx;

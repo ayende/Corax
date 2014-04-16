@@ -120,13 +120,13 @@ namespace Corax.Tests
 
 					indexer.AddField("Name", "Oren Eini");
 
-					indexer.AddField("Email", "ayende@ayende.com");
+					indexer.AddField("Email", "b@ayende.com");
 
 					indexer.NewIndexEntry();
 
 					indexer.AddField("Name", "Arava Eini");
 
-					indexer.AddField("Email", "arava@houseof.dog");
+					indexer.AddField("Email", "a@houseof.dog");
 
 					indexer.Flush();
 				}
@@ -138,8 +138,8 @@ namespace Corax.Tests
 						Field = "Email"
 					});
 
-					Assert.Equal(2, results.Results[0].DocumentId);
-					Assert.Equal(1, results.Results[1].DocumentId);
+					Assert.Equal(1, results.Results[0].DocumentId);
+					Assert.Equal(2, results.Results[1].DocumentId);
 				}
 			}
 		}

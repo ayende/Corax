@@ -4,6 +4,8 @@ using System.Runtime.CompilerServices;
 using Corax.Utils;
 using Voron;
 using Voron.Impl;
+using Voron.Trees;
+using Voron.Util.Conversion;
 
 namespace Corax.Queries
 {
@@ -11,14 +13,17 @@ namespace Corax.Queries
 	{
 		private readonly FullTextIndex _index;
 		private readonly Transaction _tx;
+		private Tree _docs;
 
 		public Searcher(FullTextIndex index)
 		{
 			_index = index;
 			_tx = _index.StorageEnvironment.NewTransaction(TransactionFlags.Read);
+
+			_docs = _tx.ReadTree("Docs");
 		}
 
-		public QueryResults QueryTop(Query query, int take, 
+		public QueryResults QueryTop(Query query, int take,
 			IndexingConventions.ScorerCalc score = null,
 			Sorter sortBy = null)
 		{
@@ -26,7 +31,7 @@ namespace Corax.Queries
 				throw new ArgumentException("Take must be non negative");
 
 			var qr = new QueryResults();
-			var heap = new Heap<QueryMatch>(take);
+			var heap = new Heap<QueryMatch>(take, GenerateComparisonFunction(sortBy));
 			foreach (var match in Query(query, score))
 			{
 				heap.Enqueue(match);
@@ -41,7 +46,59 @@ namespace Corax.Queries
 			return qr;
 		}
 
-		public IEnumerable<QueryMatch> Query(Query query, IndexingConventions.ScorerCalc score = null)
+		private Comparison<QueryMatch> GenerateComparisonFunction(Sorter sortBy)
+		{
+			if (sortBy == null)
+				return (x, y) => x.CompareTo(y);
+
+			var fieldNumber = _index.GetFieldNumber(sortBy.Field);
+
+			var factor = (sortBy.Descending ? -1 : 1);
+			return (x, y) =>
+			{
+				var xVal = GetTermForDocument(x.DocumentId, fieldNumber);
+				var yVal = GetTermForDocument(y.DocumentId, fieldNumber);
+
+				if (xVal == null && yVal == null)
+					return 0;
+				if (xVal == null)
+					return -1 * factor;
+				if (yVal == null)
+					return 1 * factor;
+
+				return xVal.CompareTo(yVal) * factor;
+			};
+		}
+
+		public ValueReader GetTermForDocument(long docId, int fieldId)
+		{
+			var buffer = _index.BufferPool.Take(FullTextIndex.DocumentFieldSize);
+			try
+			{
+				EndianBitConverter.Big.CopyBytes(docId, buffer, 0);
+				EndianBitConverter.Big.CopyBytes(fieldId, buffer, sizeof(long));
+				EndianBitConverter.Big.CopyBytes(0, buffer, sizeof(long) + sizeof(int));
+
+				using (var it = _docs.Iterate(_tx))
+				{
+					if (it.Seek(new Slice(buffer)) == false)
+						return null;
+
+					it.CurrentKey.CopyTo(buffer);
+
+					if (EndianBitConverter.Big.ToInt64(buffer, 0) != docId)
+						return null;
+
+					return it.CreateReaderForCurrent();
+				}
+			}
+			finally
+			{
+				_index.BufferPool.Return(buffer);
+			}
+		}
+
+		public IEnumerable<QueryMatch> Query(Query query, IndexingConventions.ScorerCalc score = null, Sorter sortby = null)
 		{
 			query.Initialize(_index, _tx, score ?? new DefaultScorer(_index.Conventions).Score);
 			return query.Execute();

@@ -11,6 +11,7 @@ namespace Corax.Queries
 		private readonly string _value;
 		private Tree _fieldTree;
 		private float _weight;
+		private int _fieldNumber;
 
 		public TermQuery(string field, string value)
 		{
@@ -28,6 +29,9 @@ namespace Corax.Queries
 			_fieldTree = Transaction.ReadTree("@fld_" + _field);
 			if (_fieldTree == null)
 				return;
+
+			_fieldNumber = Index.GetFieldNumber(_field);
+
 			var termFreqInDocs = _fieldTree.State.EntriesCount;
 			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();
 
@@ -40,21 +44,21 @@ namespace Corax.Queries
 			if (_fieldTree == null)
 				yield break;
 
-			var buffer = new byte[sizeof (long) + sizeof (int) + sizeof (float)];
+			var fieldDocumentBuffer = new byte[FullTextIndex.FieldDocumentSize];
 			using (var it = _fieldTree.MultiRead(Transaction, _value))
 			{
 				if (it.Seek(Slice.BeforeAllKeys) == false)
 					yield break;
 				do
 				{
-					it.CurrentKey.CopyTo(buffer);
+					it.CurrentKey.CopyTo(fieldDocumentBuffer);
 
-					var termFreq = EndianBitConverter.Big.ToInt32(buffer, sizeof (long));
-					var boost = EndianBitConverter.Big.ToSingle(buffer, sizeof (long) + sizeof (int));
+					var termFreq = EndianBitConverter.Big.ToInt32(fieldDocumentBuffer, sizeof (long));
+					var boost = EndianBitConverter.Big.ToSingle(fieldDocumentBuffer, sizeof (long) + sizeof (int));
 
 					yield return new QueryMatch
 					{
-						DocumentId = EndianBitConverter.Big.ToInt64(buffer, 0),
+						DocumentId = EndianBitConverter.Big.ToInt64(fieldDocumentBuffer, 0),
 						Score = Score(_weight, termFreq, boost * Boost)
 					};
 				} while (it.MoveNext());

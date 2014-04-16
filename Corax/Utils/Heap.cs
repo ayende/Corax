@@ -2,15 +2,16 @@
 
 namespace Corax.Utils
 {
-	public class Heap<T> 
-		where T : IComparable<T>
+	public class Heap<T>
 	{
+		private readonly Comparison<T> _comparison;
 		private readonly T[] _values;
 
 		public int Count { get; private set; }
 
-		public Heap(int size)
+		public Heap(int size, Comparison<T> comparison)
 		{
+			_comparison = comparison;
 			_values = new T[size];
 		}
 
@@ -30,7 +31,7 @@ namespace Corax.Utils
 			while (index > 0)
 			{
 				var parentIndex = (index - 1) / 2;
-				if (_values[index].CompareTo(_values[parentIndex]) < 0)
+				if (_comparison(_values[index], (_values[parentIndex])) < 0)
 					break;
 				var parent = _values[parentIndex];
 				_values[parentIndex] = _values[index];
@@ -46,7 +47,7 @@ namespace Corax.Utils
 			while (childIndex < Count)
 			{
 				if (childIndex + 1 < Count &&
-					_values[childIndex].CompareTo(_values[childIndex + 1]) < 0)
+					_comparison(_values[childIndex], (_values[childIndex + 1])) < 0)
 				{
 					childIndex++;
 				}
