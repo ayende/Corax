@@ -44,6 +44,7 @@ namespace Corax
 
 			using (var tx = StorageEnvironment.NewTransaction(TransactionFlags.ReadWrite))
 			{
+				StorageEnvironment.CreateTree(tx, "TermPositions");
 				ReadMetadata(tx);
 				ReadLastDocumentId(tx);
 				ReadFields(tx);

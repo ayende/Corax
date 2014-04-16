@@ -193,6 +193,39 @@ namespace Corax.Tests
 			}
 		}
 
+		[Fact]
+		public void CanDoPhraseQuery()
+		{
+			using (var fullTextIndex = new FullTextIndex(StorageEnvironmentOptions.CreateMemoryOnly(), new DefaultAnalyzer()))
+			{
+				using (var indexer = fullTextIndex.CreateIndexer())
+				{
+					indexer.NewIndexEntry();
+					indexer.AddField("PhraseText", "Not a match.");
+
+					indexer.NewIndexEntry();
+					indexer.AddField("PhraseText", "RavenDB is a very cool database to work with.");
+
+					indexer.Flush();
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					var results = searcher.QueryTop(new PhraseQuery("PhraseText", "RavenDB", "cool", "database"), 5);
+
+					Assert.Equal(1, results.Results.Length);
+					Assert.Equal(2, results.Results[0].DocumentId);
+				}
+
+				using (var searcher = fullTextIndex.CreateSearcher())
+				{
+					var results = searcher.QueryTop(new PhraseQuery("PhraseText", "database", "cool", "RavenDB"), 5);
+
+					Assert.Equal(0, results.Results.Length);
+				}
+			}
+		}
+
 
 		[Fact]
 		public void CanDelete()
