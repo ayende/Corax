@@ -27,5 +27,7 @@ namespace Corax.Queries
 
 		protected abstract void Init();
 		public abstract IEnumerable<QueryMatch> Execute();
+
+		public abstract override string ToString();
 	}
 }

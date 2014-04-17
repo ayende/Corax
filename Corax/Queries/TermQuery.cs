@@ -12,7 +12,6 @@ namespace Corax.Queries
 		private readonly string _value;
 		private Tree _fieldTree;
 		private float _weight;
-		private int _fieldNumber;
 
 		public TermQuery(string field, string value)
 		{
@@ -32,8 +31,6 @@ namespace Corax.Queries
 			_fieldTree = Transaction.ReadTree("@fld_" + _field);
 			if (_fieldTree == null)
 				return;
-
-			_fieldNumber = Index.GetFieldNumber(_field);
 
 			var termFreqInDocs = _fieldTree.State.EntriesCount;
 			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();

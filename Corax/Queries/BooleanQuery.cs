@@ -50,5 +50,10 @@ namespace Corax.Queries
 			}
 			return result;
 		}
+
+		public override string ToString()
+		{
+			return string.Join<Query>(" " + Op + " ", _clasues);
+		}
 	}
 }

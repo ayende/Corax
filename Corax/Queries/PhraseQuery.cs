@@ -1,88 +1,136 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Voron;
 using Voron.Trees;
 using Voron.Util.Conversion;
 
 namespace Corax.Queries
 {
-	public class PhraseQuery : Query
+	public class PhraseQuery : InQuery
 	{
-		private readonly string _field;
-		private readonly string[] _values;
-		private Tree _fieldTree;
+		private readonly Slice[] _orderedValues;
 		private Tree _positionsTree;
-		private float _weight;
-		private int _fieldNumber;
+		private Tree _docsTree;
+		private byte[] _prefix;
+		private Slice _prefixSlice;
+		private Slice _maxKeySlice;
+		private byte[] _maxKey;
+		private int _fieldId;
 
-		public PhraseQuery(string field, params string[] phraseValues)
+		public PhraseQuery(string field, params string[] values)
+			: base(field, values)
 		{
-			_field = field;
-			_values = phraseValues;
+			_orderedValues = values.Select(s => (Slice)s).ToArray();
+			Slop = 1;
 		}
+
+		public int Slop { get; set; }
 
 		public override string ToString()
 		{
-			return string.Format("{0}: {1}", _field, String.Join(" ", _values));
+			return string.Format("{0}: \"{1}\"{2} ", Field,
+				String.Join(" ", Values),
+				Slop == 1 ? "" : "~" + Slop);
 		}
 
 		protected override void Init()
 		{
-			_fieldTree = Transaction.ReadTree("@fld_" + _field);
-			if (_fieldTree == null)
-				return;
+			base.Init();
 
 			_positionsTree = Transaction.ReadTree("TermPositions");
-			if (_positionsTree == null)
-				return;
+			_docsTree = Transaction.ReadTree("Docs");
 
-			_fieldNumber = Index.GetFieldNumber(_field);
 
-			var termFreqInDocs = _fieldTree.State.EntriesCount;
-			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();
+			_fieldId = Index.GetFieldNumber(Field);
+			_prefix = new byte[FullTextIndex.FieldDocumentSize];
+			_prefixSlice = new Slice(_prefix);
 
-			var idf = Index.Conventions.Idf(termFreqInDocs, numberOfDocs);
-			_weight = idf*idf; // square it
+			_maxKey = new byte[FullTextIndex.FieldDocumentSize];
+			_maxKeySlice = new Slice(_maxKey);
 		}
 
 		public override IEnumerable<QueryMatch> Execute()
 		{
-			if (_fieldTree == null || _positionsTree == null)
-				yield break;
+			var docsWithAllTerms = base.Execute();
+			if (_orderedValues.Length == 1)
+				return docsWithAllTerms;
 
-			var fieldDocumentBuffer = new byte[FullTextIndex.FieldDocumentSize];
+			return FindMatchesForPhrases(docsWithAllTerms);
+		}
 
-			// This is not right. On the first run through I can get a document id, but the remaining values out of @fld_X
-			// are irrelevant to me. Then need to verify that the rest of the terms are present in the same document, and
-			// in the correct order. Querying @fld_X can get me the verification that the rest of the terms are present
-			// but not in a very manageable manner. Querying TermPositions by the document id can get me all the terms in the doc but
-			// then I won't know what term is what. There doesn't appear to be a straightforward way to reduce each field to its
-			// field ids, to then look up the positions and verify the orders. Must be missing something...
-
-			foreach (string value in _values)
+		private IEnumerable<QueryMatch> FindMatchesForPhrases(IEnumerable<QueryMatch> docsWithAllTerms)
+		{
+			foreach (var match in docsWithAllTerms)
 			{
-				using (var it = _fieldTree.MultiRead(Transaction, value))
+				var sort = GetTermPositionsFor(match.DocumentId);
+				if (sort == null)
+					continue; // not a match
+
+				using (var enumerator = sort.GetEnumerator())
 				{
-					if (it.Seek(Slice.BeforeAllKeys) == false)
-						continue;
-					do
+					int foundPos = 0;
+					int lastPos = 0;
+					while (enumerator.MoveNext())
 					{
-						it.CurrentKey.CopyTo(fieldDocumentBuffer);
-
-						var termFreq = EndianBitConverter.Big.ToInt32(fieldDocumentBuffer, sizeof(long));
-						var boost = EndianBitConverter.Big.ToSingle(fieldDocumentBuffer, sizeof(long) + sizeof(int));
-
-						yield return new QueryMatch
+						var currentPos = enumerator.Current.Key;
+						if (_orderedValues[foundPos].Equals(enumerator.Current.Value) == false)
 						{
-							DocumentId = EndianBitConverter.Big.ToInt64(fieldDocumentBuffer, 0),
-							Score = Score(_weight, termFreq, boost * Boost)
-						};
-					} while (it.MoveNext());
+							if (foundPos != 0 && (lastPos + Slop < currentPos)) // we are past the slop we need, reset
+							{
+								foundPos = 0;
+								lastPos = 0;
+							}
+							continue;
+						}
+						foundPos++;
+						lastPos = currentPos;
+						if (foundPos == _orderedValues.Length) // found all, done
+						{
+							yield return match;
+							break;
+						}
+					}
 				}
 			}
+		}
+
+		private SortedList<int, Slice> GetTermPositionsFor(long documentId)
+		{
+			using (var posIt = _positionsTree.Iterate(Transaction))
+			{
+				EndianBitConverter.Big.CopyBytes(documentId, _prefix, 0);
+				EndianBitConverter.Big.CopyBytes(_fieldId, _prefix, sizeof (long));
+
+				EndianBitConverter.Big.CopyBytes(documentId, _maxKey, 0);
+				EndianBitConverter.Big.CopyBytes(_fieldId, _maxKey, sizeof (long));
+				EndianBitConverter.Big.CopyBytes(int.MaxValue, _maxKey, sizeof (long) + sizeof (int));
+
+				posIt.MaxKey = _maxKeySlice;
+				if (posIt.Seek(_prefixSlice) == false)
+					return null;
+
+				var sort = new SortedList<int, Slice>();
+				do
+				{
+					var term = _docsTree.Read(Transaction, posIt.CurrentKey);
+					if (term == null)
+						continue;
+
+					var slice = term.Reader.AsSlice();
+					var reader = posIt.CreateReaderForCurrent();
+					while (reader.EndOfData == false)
+					{
+						sort.Add(reader.ReadInt32(), slice);
+					}
+				} while (posIt.MoveNext());
+				return sort;
+			}
+		}
+
+		protected override IEnumerable<QueryMatch> JoinSubqueries(IEnumerable<QueryMatch> left, IEnumerable<QueryMatch> right)
+		{
+			return left.Intersect(right, QueryMatchComparer.Instance);
 		}
 	}
 }

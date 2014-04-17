@@ -9,8 +9,8 @@ namespace Corax.Queries
 {
 	public class InQuery : Query
 	{
-		private readonly List<string> _values;
-		private readonly string _field;
+		protected readonly List<string> Values;
+		protected readonly string Field;
 		private Tree _fieldTree;
 		private float _weight;
 		private readonly byte[] _fieldDocumentBuffer = new byte[FullTextIndex.FieldDocumentSize];
@@ -20,13 +20,13 @@ namespace Corax.Queries
 			if (field == null) throw new ArgumentNullException("field");
 			if (values == null) throw new ArgumentNullException("values");
 
-			_field = field;
-			_values = new List<string>(values);
+			Field = field;
+			Values = new List<string>(values);
 		}
 
 		protected override void Init()
 		{
-			_fieldTree = Transaction.ReadTree("@fld_" + _field);
+			_fieldTree = Transaction.ReadTree("@fld_" + Field);
 			if (_fieldTree == null)
 				return;
 
@@ -36,22 +36,33 @@ namespace Corax.Queries
 			var idf = Index.Conventions.Idf(termFreqInDocs, numberOfDocs);
 			_weight = idf*idf;
 
-			_values.Sort();
+			Values.Sort();
 		}
 
 		public override IEnumerable<QueryMatch> Execute()
 		{
-			if (_values.Count == 0 || _fieldTree == null)
+			if (Values.Count == 0 || _fieldTree == null)
 				return Enumerable.Empty<QueryMatch>();
 
-			var result = SingleQueryMatch(_values[0]);
+			var result = SingleQueryMatch(Values[0]);
 
-			for (var i = 1; i < _values.Count; i++)
+			for (var i = 1; i < Values.Count; i++)
 			{
-				result = result.Union(SingleQueryMatch(_values[i]), QueryMatchComparer.Instance);
+				var right = SingleQueryMatch(Values[i]);
+				result = JoinSubqueries(result, right);
 			}
 
 			return result;
+		}
+
+		protected virtual IEnumerable<QueryMatch> JoinSubqueries(IEnumerable<QueryMatch> left, IEnumerable<QueryMatch> right)
+		{
+			return left.Union(right, QueryMatchComparer.Instance);
+		}
+
+		public override string ToString()
+		{
+			return string.Format("@in<{0}>: ({1})", Field, string.Join(", ", Values));
 		}
 
 		private IEnumerable<QueryMatch> SingleQueryMatch(string value)

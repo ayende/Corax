@@ -201,17 +201,20 @@ namespace Corax.Tests
 				using (var indexer = fullTextIndex.CreateIndexer())
 				{
 					indexer.NewIndexEntry();
-					indexer.AddField("PhraseText", "Not a match.");
+					indexer.AddField("PhraseText", "Not a match.", options: FieldOptions.TermPositions);
 
 					indexer.NewIndexEntry();
-					indexer.AddField("PhraseText", "RavenDB is a very cool database to work with.");
+					indexer.AddField("PhraseText", "RavenDB is a very cool database to work with.", options: FieldOptions.TermPositions);
 
 					indexer.Flush();
 				}
 
 				using (var searcher = fullTextIndex.CreateSearcher())
 				{
-					var results = searcher.QueryTop(new PhraseQuery("PhraseText", "RavenDB", "cool", "database"), 5);
+					var results = searcher.QueryTop(new PhraseQuery("PhraseText", "ravendb", "cool", "database")
+					{
+						Slop = 4
+					}, 5);
 
 					Assert.Equal(1, results.Results.Length);
 					Assert.Equal(2, results.Results[0].DocumentId);
@@ -219,7 +222,10 @@ namespace Corax.Tests
 
 				using (var searcher = fullTextIndex.CreateSearcher())
 				{
-					var results = searcher.QueryTop(new PhraseQuery("PhraseText", "database", "cool", "RavenDB"), 5);
+					var results = searcher.QueryTop(new PhraseQuery("PhraseText", "database", "cool", "ravendb")
+					{
+						Slop = 4
+					}, 5);
 
 					Assert.Equal(0, results.Results.Length);
 				}

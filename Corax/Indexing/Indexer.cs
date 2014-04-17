@@ -196,14 +196,16 @@ namespace Corax.Indexing
 				var slice = new Slice(documentBuffer);
 				_writeBatch.Add(slice, termSlice, "Docs");
 
-				if (info.Positions != null)
-				{
-					var positionBuffer = new byte[sizeof (int)*info.Positions.Count];
-					for (var i = 0; i < info.Positions.Count; i++)
-						EndianBitConverter.Big.CopyBytes(info.Positions[i], positionBuffer, i*sizeof (int));
-					var positionSlice = new Slice(positionBuffer);
-					_writeBatch.Add(slice, positionSlice, "TermPositions");
-				}
+				if (info.Positions == null)
+					continue;
+
+				var positionBuffer = _bufferPool.Take(sizeof(int) * info.Positions.Count);
+				_usedBuffers.Add(positionBuffer);
+
+				for (var i = 0; i < info.Positions.Count; i++)
+					EndianBitConverter.Little.CopyBytes(info.Positions[i], positionBuffer, i*sizeof (int));
+				var positionSlice = new Slice(positionBuffer);
+				_writeBatch.Add(slice, positionSlice, "TermPositions");
 			}
 
 			_currentTerms.Clear();
