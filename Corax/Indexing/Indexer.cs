@@ -193,7 +193,17 @@ namespace Corax.Indexing
 				Buffer.BlockCopy(docBuffer, 0, documentBuffer, 0, sizeof (long));
 				EndianBitConverter.Big.CopyBytes(_parent.GetFieldNumber(field), documentBuffer, sizeof (long));
 				EndianBitConverter.Big.CopyBytes(fieldCount, documentBuffer, sizeof (long) + sizeof (int));
-				_writeBatch.Add(new Slice(documentBuffer), termSlice, "Docs");
+				var slice = new Slice(documentBuffer);
+				_writeBatch.Add(slice, termSlice, "Docs");
+
+				if (info.Positions != null)
+				{
+					var positionBuffer = new byte[sizeof (int)*info.Positions.Count];
+					for (var i = 0; i < info.Positions.Count; i++)
+						EndianBitConverter.Big.CopyBytes(info.Positions[i], positionBuffer, i*sizeof (int));
+					var positionSlice = new Slice(positionBuffer);
+					_writeBatch.Add(slice, positionSlice, "TermPositions");
+				}
 			}
 
 			_currentTerms.Clear();
