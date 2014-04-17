@@ -45,7 +45,7 @@
     <Compile Include="FullTextIndex.cs" />
     <Compile Include="IndexingConventions.cs" />
     <Compile Include="Indexing\DefaultAnalyzer.cs" />
-    <Compile Include="Indexing\Filters\AbstractFilter.cs" />
+    <Compile Include="Indexing\Filters\IFilter.cs" />
     <Compile Include="Indexing\Filters\ArraySegmentKey.cs" />
     <Compile Include="Indexing\Indexer.cs" />
     <Compile Include="Indexing\Filters\RemovePossesiveSuffix.cs" />
@@ -54,12 +54,17 @@
     <Compile Include="Indexing\FieldOptions.cs" />
     <Compile Include="Indexing\Filters\LowerCaseFilter.cs" />
     <Compile Include="Indexing\ITokenSource.cs" />
+    <Compile Include="Queries\ICompareQueryMatches.cs" />
     <Compile Include="Queries\InQuery.cs" />
     <Compile Include="Queries\BooleanQuery.cs" />
     <Compile Include="Queries\Query.cs" />
     <Compile Include="Queries\QueryMatch.cs" />
+    <Compile Include="Queries\QueryMatchComparer.cs" />
+    <Compile Include="Queries\QueryOperator.cs" />
     <Compile Include="Queries\QueryResults.cs" />
     <Compile Include="Queries\Searcher.cs" />
+    <Compile Include="Queries\SortByScore.cs" />
+    <Compile Include="Queries\SortByTerm.cs" />
     <Compile Include="Queries\Sorter.cs" />
     <Compile Include="Queries\TermQuery.cs" />
     <Compile Include="Utils\BufferPool.cs" />
