@@ -224,8 +224,6 @@ namespace Corax.Tests
 					var results = searcher.QueryTop(new InQuery("Name", "joe", "epping", "boike"), 5);
 
 					Assert.Equal(3, results.Results.Length);
-					Console.WriteLine("{0}, {1}, {2}", results.Results[0].DocumentId, results.Results[1].DocumentId,
-						results.Results[2].DocumentId);
 				}
 			}
 		}

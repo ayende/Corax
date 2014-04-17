@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Voron;
 using Voron.Trees;
 using Voron.Util.Conversion;
@@ -15,6 +16,8 @@ namespace Corax.Queries
 
 		public TermQuery(string field, string value)
 		{
+			if (field == null) throw new ArgumentNullException("field");
+			if (value == null) throw new ArgumentNullException("value");
 			_field = field;
 			_value = value;
 		}
@@ -36,7 +39,7 @@ namespace Corax.Queries
 			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();
 
 			var idf = Index.Conventions.Idf(termFreqInDocs, numberOfDocs);
-			_weight = idf*idf; // square it
+			_weight = idf*idf;
 		}
 
 		public override IEnumerable<QueryMatch> Execute()

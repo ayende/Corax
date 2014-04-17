@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Voron;
@@ -6,22 +7,21 @@ using Voron.Util.Conversion;
 
 namespace Corax.Queries
 {
-	//TODO: Use BooleanQuery With 'OR' ??
 	public class InQuery : Query
 	{
-		private readonly string[] _values;
+		private readonly List<string> _values;
 		private readonly string _field;
-		private readonly TermQuery[] _termQueries ;
 		private Tree _fieldTree;
-		private int _fieldNumber;
 		private float _weight;
-		private string[] _sortedValues;
+		private readonly byte[] _fieldDocumentBuffer = new byte[FullTextIndex.FieldDocumentSize];
 
 		public InQuery(string field, params string[] values)
 		{
+			if (field == null) throw new ArgumentNullException("field");
+			if (values == null) throw new ArgumentNullException("values");
+
 			_field = field;
-			_values = values;
-			_termQueries = new TermQuery[_values.Length];
+			_values = new List<string>(values);
 		}
 
 		protected override void Init()
@@ -30,51 +30,50 @@ namespace Corax.Queries
 			if (_fieldTree == null)
 				return;
 
-			_fieldNumber = Index.GetFieldNumber(_field);
-
 			var termFreqInDocs = _fieldTree.State.EntriesCount;
 			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();
 
 			var idf = Index.Conventions.Idf(termFreqInDocs, numberOfDocs);
-			_weight = idf*idf; // square it
+			_weight = idf*idf;
 
-			_sortedValues = _values.AsQueryable().OrderBy(x => x).ToArray(); 
-			
+			_values.Sort();
 		}
 
 		public override IEnumerable<QueryMatch> Execute()
 		{
-			if (_values == null || _values.Length == 0)
-			{
-				yield break;
-			}
-			
-			if (_fieldTree == null)
-				yield break;
+			if (_values.Count == 0 || _fieldTree == null)
+				return Enumerable.Empty<QueryMatch>();
 
-			foreach (var value in _sortedValues)
+			var result = SingleQueryMatch(_values[0]);
+
+			for (var i = 1; i < _values.Count; i++)
 			{
-				var fieldDocumentBuffer = new byte[FullTextIndex.FieldDocumentSize];
-				using (var it = _fieldTree.MultiRead(Transaction, value))
+				result = result.Union(SingleQueryMatch(_values[i]), QueryMatchComparer.Instance);
+			}
+
+			return result;
+		}
+
+		private IEnumerable<QueryMatch> SingleQueryMatch(string value)
+		{
+			using (var it = _fieldTree.MultiRead(Transaction, value))
+			{
+				if (it.Seek(Slice.BeforeAllKeys) == false)
+					yield break; // yield break;
+				do
 				{
-					if (it.Seek(Slice.BeforeAllKeys) == false)
-						yield break;
-					do
+					it.CurrentKey.CopyTo(_fieldDocumentBuffer);
+
+					var termFreq = EndianBitConverter.Big.ToInt32(_fieldDocumentBuffer, sizeof(long));
+					var boost = EndianBitConverter.Big.ToSingle(_fieldDocumentBuffer, sizeof(long) + sizeof(int));
+
+					yield return new QueryMatch
 					{
-						it.CurrentKey.CopyTo(fieldDocumentBuffer);
-
-						var termFreq = EndianBitConverter.Big.ToInt32(fieldDocumentBuffer, sizeof (long));
-						var boost = EndianBitConverter.Big.ToSingle(fieldDocumentBuffer, sizeof (long) + sizeof (int));
-
-						yield return new QueryMatch
-						{
-							DocumentId = EndianBitConverter.Big.ToInt64(fieldDocumentBuffer, 0),
-							Score = Score(_weight, termFreq, boost*Boost)
-						};
-					} while (it.MoveNext());
-				}
+						DocumentId = EndianBitConverter.Big.ToInt64(_fieldDocumentBuffer, 0),
+						Score = Score(_weight, termFreq, boost*Boost)
+					};
+				} while (it.MoveNext());
 			}
-
 		}
 	}
 }
