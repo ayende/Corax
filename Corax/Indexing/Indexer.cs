@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Corax.Indexing.Filters;
 using Corax.Utils;
 using Voron;
@@ -27,7 +29,9 @@ namespace Corax.Indexing
 		private readonly BufferPool _bufferPool;
 
 		private readonly Dictionary<string, string> _fieldTreesCache = new Dictionary<string, string>();
-		private readonly List<byte[]> _usedBuffers = new List<byte[]>();
+		private List<byte[]> _usedBuffers = new List<byte[]>();
+
+		private readonly List<Task> _flushTasks = new List<Task>();
 
 		public class TermInfo
 		{
@@ -233,14 +237,35 @@ namespace Corax.Indexing
 		public void Flush()
 		{
 			FlushCurrentDocument();
-			_parent.StorageEnvironment.Writer.Write(_writeBatch);
+
+			if (_flushTasks.Count >= 8)
+			{
+				var array = _flushTasks.ToArray();
+				Task.WaitAll(array);
+				_flushTasks.Clear();
+			}
+
+			var buffers = _usedBuffers;
+			var batch = _writeBatch;
 			
 			_writeBatch = new WriteBatch();
-			foreach (var usedBuffer in _usedBuffers)
+			_usedBuffers = new List<byte[]>();
+
+			_flushTasks.Add(Task.Run(() =>
 			{
-				_bufferPool.Return(usedBuffer);
-			}
-			_usedBuffers.Clear();
+				try
+				{
+					_parent.StorageEnvironment.Writer.Write(batch);
+				}
+				finally
+				{
+					foreach (var usedBuffer in buffers)
+					{
+						_bufferPool.Return(usedBuffer);
+					}
+				}
+			}));
+
 		}
 
 		public void AddField(string field, string indexedValue = null, string storedValue = null, FieldOptions options = FieldOptions.None)
@@ -315,6 +340,8 @@ namespace Corax.Indexing
 				_bufferPool.Return(usedBuffer);
 			}
 			_usedBuffers.Clear();
+
+			Task.WaitAll(_flushTasks.ToArray());
 		}
 
 		private class ReusableBinaryWriter : BinaryWriter
