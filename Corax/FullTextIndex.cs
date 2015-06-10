@@ -1,165 +1,213 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Corax.Indexing;
 using Corax.Queries;
 using Corax.Utils;
 using Voron;
 using Voron.Impl;
+using Voron.Trees;
 using Voron.Util.Conversion;
 
 namespace Corax
 {
-	public class FullTextIndex : IDisposable
-	{
-		internal const int FieldDocumentSize =
-					sizeof(long) +  // document id
-					sizeof(int) + // term freq in doc
-					sizeof(float); // boost val
+    public class FullTextIndex : IDisposable
+    {
+        private long _lastDocumentId;
 
-		internal const int DocumentFieldSize =
-			sizeof(long) + // document id
-			sizeof(int) + // field id
-			sizeof(int); // field value counter
+        public IAnalyzer Analyzer { get; private set; }
+        public Guid Id { get; private set; }
+        public BufferPool BufferPool { get; private set; }
+        public StorageEnvironment StorageEnvironment { get; private set; }
 
-		private long _lastDocumentId;
-		private int _lastFieldId;
+        public IndexingConventions Conventions { get; private set; }
 
-		public IAnalyzer Analyzer { get; private set; }
-		public Guid Id { get; private set; }
-		public BufferPool BufferPool { get; private set; }
-		public StorageEnvironment StorageEnvironment { get; private set; }
+        public long NumberOfDocuments
+        {
+            get
+            {
+                using(var tx = StorageEnvironment.NewTransaction(TransactionFlags.Read))
+                {
+                    return tx.ReadTree("docs").State.EntriesCount;
+                }
+            }
+        }
 
-		private readonly ConcurrentDictionary<string, int> _fieldsNamesToIds = new ConcurrentDictionary<string, int>();
-		private readonly ConcurrentDictionary<int, string> _fieldIdsToName = new ConcurrentDictionary<int, string>();
+        public long NumberOfDeletes
+        {
+            get
+            {
+                using (var tx = StorageEnvironment.NewTransaction(TransactionFlags.Read))
+                {
+                    return tx.ReadTree("deletes").State.EntriesCount;
+                }
+            }
+        }
 
-		public IndexingConventions Conventions { get; private set; }
+        private Task _backgroundCompaction;
+        private CancellationTokenSource _cts = new CancellationTokenSource();
 
-		public FullTextIndex(StorageEnvironmentOptions options, IAnalyzer analyzer)
-		{
-			Analyzer = analyzer;
-			Conventions = new IndexingConventions();
-			BufferPool = new BufferPool();
-			StorageEnvironment = new StorageEnvironment(options);
+        public FullTextIndex(StorageEnvironmentOptions options, IAnalyzer analyzer)
+        {
+            Analyzer = analyzer;
+            Conventions = new IndexingConventions();
+            BufferPool = new BufferPool();
+            StorageEnvironment = new StorageEnvironment(options);
 
-			using (var tx = StorageEnvironment.NewTransaction(TransactionFlags.ReadWrite))
-			{
-				StorageEnvironment.CreateTree(tx, "TermPositions");
-				ReadMetadata(tx);
-				ReadLastDocumentId(tx);
-				ReadFields(tx);
+            using (var tx = StorageEnvironment.NewTransaction(TransactionFlags.ReadWrite))
+            {
+                StorageEnvironment.CreateTree(tx, "@terms", keysPrefixing: true);
+                StorageEnvironment.CreateTree(tx, "deletes", keysPrefixing: true);
+                var docs = StorageEnvironment.CreateTree(tx, "docs", keysPrefixing: true);
 
-				tx.Commit();
-			}
-		}
+                var metadata = StorageEnvironment.CreateTree(tx, "$metadata");
+                var idVal = metadata.Read("id");
+                if (idVal == null)
+                {
+                    Id = Guid.NewGuid();
+                    metadata.Add("id", Id.ToByteArray());
+                }
+                else
+                {
+                    int _;
+                    Id = new Guid(idVal.Reader.ReadBytes(16, out _));
+                }
+                using (var it = docs.Iterate())
+                {
+                    _lastDocumentId = it.Seek(Slice.AfterAllKeys) == false ?
+                        0 :
+                        it.CurrentKey.CreateReader().ReadBigEndianInt64();
+                }
+                tx.Commit();
+            }
+        }
 
 
-		public string GetFieldName(int fieldId)
-		{
-			string value;
-			_fieldIdsToName.TryGetValue(fieldId, out value);
-			return value;
-		}
+        internal long NextDocumentId()
+        {
+            return Interlocked.Increment(ref _lastDocumentId);
+        }
 
-		public int GetFieldNumber(string field)
-		{
-			int num;
-			if (_fieldsNamesToIds.TryGetValue(field, out num))
-				return num;
+        public Indexer CreateIndexer()
+        {
+            return new Indexer(this);
+        }
 
-			lock (_fieldsNamesToIds)
-			{
-				if (_fieldsNamesToIds.TryGetValue(field, out num))
-					return num;
+        public Searcher CreateSearcher()
+        {
+            return new Searcher(this);
+        }
 
-				_lastFieldId++;
+        public void Dispose()
+        {
+            using (_cts)
+            using (StorageEnvironment)
+            {
+                _cts.Cancel();
+                var backgroundCompaction = _backgroundCompaction;
+                if (backgroundCompaction != null)
+                {
+                    backgroundCompaction.Wait();
+                }
+            }
+        }
 
-				var wb = new WriteBatch();
-				wb.Add(field, new Slice(BitConverter.GetBytes(_lastFieldId)), "FieldNames");
-				StorageEnvironment.Writer.Write(wb);
+        public void MaybeStartCompaction()
+        {
+            if (Conventions.AutoCompact == false)
+                return;
+            if (_backgroundCompaction != null)
+            {
+                if (_backgroundCompaction.IsCanceled || _backgroundCompaction.IsFaulted)
+                {
+                    var oldBackgroundCompaction = _backgroundCompaction;
+                    if (Interlocked.CompareExchange(ref _backgroundCompaction, null, oldBackgroundCompaction) ==
+                        oldBackgroundCompaction)
+                        oldBackgroundCompaction.Wait();
+                }
+                return;
+            }
 
-				_fieldIdsToName.TryAdd(_lastFieldId, field);
-				_fieldsNamesToIds.TryAdd(field, _lastFieldId);
 
-				return _lastFieldId;
-			}
-		}
+            using (var tx = StorageEnvironment.NewTransaction(TransactionFlags.Read))
+            {
+                var deletedDocuments = tx.ReadTree("deletes").State.EntriesCount;
+                var allDocuments = tx.ReadTree("docs").State.EntriesCount;
+                if (deletedDocuments == 0)
+                    return;
+                var threshold = allDocuments / 5;
+                if (deletedDocuments < threshold)
+                    return;
+            }
 
-		private void ReadMetadata(Transaction tx)
-		{
-			var metadata = StorageEnvironment.CreateTree(tx, "$metadata");
-			var idVal = metadata.Read("id");
-			if (idVal == null)
-			{
-				Id = Guid.NewGuid();
-				metadata.Add("id", Id.ToByteArray());
-				metadata.Add("docs", BitConverter.GetBytes(0L));
-			}
-			else
-			{
-			    int _;
-			    Id = new Guid(idVal.Reader.ReadBytes(16, out _));
-			    NumberOfDocuments = metadata.Read("docs").Reader.ReadLittleEndianInt64();
-			}
-		}
+            var backgroundCompaction = new Task(RunCompaction);
+            if (Interlocked.CompareExchange(ref backgroundCompaction, backgroundCompaction, null) != null)
+                return;
+            if (_cts.IsCancellationRequested == false)
+                backgroundCompaction.Start();
+        }
 
-		public long NumberOfDocuments { get; set; }
+        public void RunCompaction()
+        {
+            while (_cts.IsCancellationRequested == false)
+            {
+                var docIds = new List<Slice>();
+                var terms = new List<Tuple<Slice, string>>();
+                using (var tx = StorageEnvironment.NewTransaction(TransactionFlags.Read))
+                {
+                    var deletes = tx.ReadTree("deletes");
+                    using (var docIt = deletes.Iterate())
+                    {
+                        if (docIt.Seek(Slice.BeforeAllKeys) == false)
+                            return; // we are done, no more deletes
+                        do
+                        {
+                          docIds.Add(docIt.CurrentKey.Clone());
+                        } while (docIt.MoveNext() && docIds.Count < 1024);
+                    }
 
-		private void ReadFields(Transaction tx)
-		{
-			var fields = StorageEnvironment.CreateTree(tx, "FieldNames");
-			using (var it = fields.Iterate())
-			{
-				if (it.Seek(Slice.BeforeAllKeys))
-				{
-					do
-					{
-						var field = it.CurrentKey.ToString();
-						var id = it.CreateReaderForCurrent().ReadLittleEndianInt32();
-						_fieldsNamesToIds.TryAdd(field, id);
-						_fieldIdsToName.TryAdd(id, field);
-						_lastFieldId = Math.Max(_lastFieldId, id);
-					} while (it.MoveNext());
-				}
-			}
-		}
+                    using (var it = StorageEnvironment.State.Root.Iterate())
+                    {
+                        it.RequiredPrefix = "@fld_";
+                        if (it.Seek(it.RequiredPrefix))
+                        {
+                            do
+                            {
+                                var tree = tx.ReadTree(it.CurrentKey.ToString());
+                                using (var termsIt = tree.Iterate())
+                                {
+                                    if (termsIt.Seek(Slice.BeforeAllKeys))
+                                    {
+                                        do
+                                        {
+                                            terms.Add(Tuple.Create(termsIt.CurrentKey.Clone(), tree.Name));
+                                        } while (termsIt.MoveNext());                                        
+                                    }
+                                }
+                                
+                            } while (it.MoveNext());
+                        }
+                    }
+                }
 
-		private void ReadLastDocumentId(Transaction tx)
-		{
-			var docs = StorageEnvironment.CreateTree(tx, "Docs");
-			using (var it = docs.Iterate())
-			{
-				if (it.Seek(Slice.AfterAllKeys) == false)
-				{
-					_lastDocumentId = 0;
-					return;
-				}
-				var buffer = new byte[DocumentFieldSize];
-				it.CurrentKey.CopyTo(buffer);
-				_lastDocumentId = EndianBitConverter.Big.ToInt64(buffer, 0);
-			}
-		}
+                var writeBatch = new WriteBatch();
+                foreach (var docId in docIds)
+                {
+                    foreach (var term in terms)
+                    {
+                        writeBatch.MultiDelete(term.Item1, docId, term.Item2);
+                    }
+                    writeBatch.Delete(docId, "deletes");
+                    writeBatch.Delete(docId, "docs");
 
-		internal long NextDocumentId()
-		{
-			return Interlocked.Increment(ref _lastDocumentId);
-		}
+                    if (writeBatch.Size() > 1024*1024*8)
+                        break;
+                }
+                StorageEnvironment.Writer.Write(writeBatch);
 
-		public Indexer CreateIndexer()
-		{
-			return new Indexer(this);
-		}
-
-		public Searcher CreateSearcher()
-		{
-			return new Searcher(this);
-		}
-
-		public void Dispose()
-		{
-			if (StorageEnvironment != null)
-				StorageEnvironment.Dispose();
-		}
-
-	}
+            }
+        }
+    }
 }

@@ -47,7 +47,7 @@ namespace Tryouts
 								}
 
 								indexer.NewIndexEntry();
-								indexer.AddField("Title", line);
+								indexer.Index("Title", line);
 
 
 							}

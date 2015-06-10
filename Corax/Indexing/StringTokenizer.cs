@@ -37,10 +37,10 @@ namespace Corax.Indexing
 		{
 			Size = 0;
 			Position++;
-			char curr = '\0';
+			char ch = '\0';
 			while (true)
 			{
-				char prev = curr;
+				char prev = ch;
 				int r = _reader.Read();
 				Column++;
 				if (r == -1) // EOF
@@ -49,23 +49,23 @@ namespace Corax.Indexing
 					{
 						// we have an unterminated string, so we will ignore the quote, instead of erroring
 						SetReader(new StringReader(new string(Buffer, 0, Size)));
-						curr = '\0';
+						ch = '\0';
 						continue;
 					}
 					return Size > 0;
 				}
 
-				curr = (char) r;
-				if (curr == '\r' || curr == '\n')
+				ch = (char) r;
+				if (ch == '\r' || ch == '\n')
 				{
 					Column = 0;
-					if (prev != '\r' || curr != '\n')
+					if (prev != '\r' || ch != '\n')
 					{
 						Line++; // only move to new line if it isn't the \n in a \r\n pair
 					}
 					if (_quoted)
 					{
-						AppendToBuffer(curr);
+						AppendToBuffer(ch);
 						if (BufferFull)
 						{
 							return true;
@@ -75,11 +75,11 @@ namespace Corax.Indexing
 						return true;
 					continue;
 				}
-				if (char.IsWhiteSpace(curr))
+				if (char.IsWhiteSpace(ch))
 				{
 					if (_quoted) // for a quoted string, we will continue until the end of the string
 					{
-						AppendToBuffer(curr);
+						AppendToBuffer(ch);
 						if (BufferFull)
 						{
 							return true;
@@ -89,7 +89,7 @@ namespace Corax.Indexing
 						return true;
 					continue;
 				}
-				if (curr == '"')
+				if (ch == '"')
 				{
 					if (_quoted == false)
 					{
@@ -102,7 +102,7 @@ namespace Corax.Indexing
 					return true;
 				}
 
-				if (char.IsPunctuation(curr))
+				if (char.IsPunctuation(ch))
 				{
 					// if followed by whitespace, ignore
 					int next = _reader.Peek();
@@ -110,7 +110,7 @@ namespace Corax.Indexing
 						continue;
 				}
 
-				AppendToBuffer(curr);
+				AppendToBuffer(ch);
 				if (BufferFull)
 					return true;
 			}

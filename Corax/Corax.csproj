@@ -51,7 +51,6 @@
     <Compile Include="Indexing\Filters\RemovePossesiveSuffix.cs" />
     <Compile Include="Indexing\Filters\StopWordsFilter.cs" />
     <Compile Include="Indexing\IAnalyzer.cs" />
-    <Compile Include="Indexing\FieldOptions.cs" />
     <Compile Include="Indexing\Filters\LowerCaseFilter.cs" />
     <Compile Include="Indexing\ITokenSource.cs" />
     <Compile Include="Queries\PhraseQuery.cs" />
