@@ -31,7 +31,7 @@ namespace Corax.Queries
 				return;
 
 			var termFreqInDocs = _fieldTree.State.EntriesCount;
-			var numberOfDocs = Transaction.ReadTree("$metadata").Read(Transaction, "docs").Reader.ReadInt64();
+			var numberOfDocs = Transaction.ReadTree("$metadata").Read("docs").Reader.ReadLittleEndianInt64();
 
 			var idf = Index.Conventions.Idf(termFreqInDocs, numberOfDocs);
 			_weight = idf*idf;
@@ -67,7 +67,7 @@ namespace Corax.Queries
 
 		private IEnumerable<QueryMatch> SingleQueryMatch(string value)
 		{
-			using (var it = _fieldTree.MultiRead(Transaction, value))
+			using (var it = _fieldTree.MultiRead(value))
 			{
 				if (it.Seek(Slice.BeforeAllKeys) == false)
 					yield break; // yield break;

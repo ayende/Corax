@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corax", "Corax\Corax.csproj", "{725A2392-504F-4D52-AE69-D52395DA0960}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corax.Tests", "Corax.Tests\Corax.Tests.csproj", "{73121271-D49F-4A00-8634-D37CBB20453C}"
@@ -12,32 +14,41 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{B09CAC
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voron", "..\ravendb-3.0\Raven.Voron\Voron\Voron.csproj", "{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tryouts", "Tryouts\Tryouts.csproj", "{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voron", "..\ravendb\Raven.Voron\Voron\Voron.csproj", "{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Profiling|Any CPU = Profiling|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{725A2392-504F-4D52-AE69-D52395DA0960}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{725A2392-504F-4D52-AE69-D52395DA0960}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{725A2392-504F-4D52-AE69-D52395DA0960}.Profiling|Any CPU.ActiveCfg = Release|Any CPU
+		{725A2392-504F-4D52-AE69-D52395DA0960}.Profiling|Any CPU.Build.0 = Release|Any CPU
 		{725A2392-504F-4D52-AE69-D52395DA0960}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{725A2392-504F-4D52-AE69-D52395DA0960}.Release|Any CPU.Build.0 = Release|Any CPU
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73121271-D49F-4A00-8634-D37CBB20453C}.Profiling|Any CPU.ActiveCfg = Release|Any CPU
+		{73121271-D49F-4A00-8634-D37CBB20453C}.Profiling|Any CPU.Build.0 = Release|Any CPU
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{73121271-D49F-4A00-8634-D37CBB20453C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}.Profiling|Any CPU.ActiveCfg = Release|Any CPU
+		{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}.Profiling|Any CPU.Build.0 = Release|Any CPU
 		{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2D8D66B9-D00B-46CB-B73D-73A9D7F6A8A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Profiling|Any CPU.ActiveCfg = Profiling|Any CPU
+		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Profiling|Any CPU.Build.0 = Profiling|Any CPU
+		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

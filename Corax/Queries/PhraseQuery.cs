@@ -97,7 +97,7 @@ namespace Corax.Queries
 
 		private SortedList<int, Slice> GetTermPositionsFor(long documentId)
 		{
-			using (var posIt = _positionsTree.Iterate(Transaction))
+			using (var posIt = _positionsTree.Iterate())
 			{
 				EndianBitConverter.Big.CopyBytes(documentId, _prefix, 0);
 				EndianBitConverter.Big.CopyBytes(_fieldId, _prefix, sizeof (long));
@@ -113,7 +113,7 @@ namespace Corax.Queries
 				var sort = new SortedList<int, Slice>();
 				do
 				{
-					var term = _docsTree.Read(Transaction, posIt.CurrentKey);
+					var term = _docsTree.Read( posIt.CurrentKey);
 					if (term == null)
 						continue;
 
@@ -121,7 +121,7 @@ namespace Corax.Queries
 					var reader = posIt.CreateReaderForCurrent();
 					while (reader.EndOfData == false)
 					{
-						sort.Add(reader.ReadInt32(), slice);
+						sort.Add(reader.ReadLittleEndianInt32(), slice);
 					}
 				} while (posIt.MoveNext());
 				return sort;

@@ -88,17 +88,18 @@ namespace Corax
 		private void ReadMetadata(Transaction tx)
 		{
 			var metadata = StorageEnvironment.CreateTree(tx, "$metadata");
-			var idVal = metadata.Read(tx, "id");
+			var idVal = metadata.Read("id");
 			if (idVal == null)
 			{
 				Id = Guid.NewGuid();
-				metadata.Add(tx, "id", Id.ToByteArray());
-				metadata.Add(tx, "docs", BitConverter.GetBytes(0L));
+				metadata.Add("id", Id.ToByteArray());
+				metadata.Add("docs", BitConverter.GetBytes(0L));
 			}
 			else
 			{
-				Id = new Guid(idVal.Reader.ReadBytes(16));
-				NumberOfDocuments = metadata.Read(tx, "docs").Reader.ReadInt64();
+			    int _;
+			    Id = new Guid(idVal.Reader.ReadBytes(16, out _));
+			    NumberOfDocuments = metadata.Read("docs").Reader.ReadLittleEndianInt64();
 			}
 		}
 
@@ -107,14 +108,14 @@ namespace Corax
 		private void ReadFields(Transaction tx)
 		{
 			var fields = StorageEnvironment.CreateTree(tx, "FieldNames");
-			using (var it = fields.Iterate(tx))
+			using (var it = fields.Iterate())
 			{
 				if (it.Seek(Slice.BeforeAllKeys))
 				{
 					do
 					{
 						var field = it.CurrentKey.ToString();
-						var id = it.CreateReaderForCurrent().ReadInt32();
+						var id = it.CreateReaderForCurrent().ReadLittleEndianInt32();
 						_fieldsNamesToIds.TryAdd(field, id);
 						_fieldIdsToName.TryAdd(id, field);
 						_lastFieldId = Math.Max(_lastFieldId, id);
@@ -126,7 +127,7 @@ namespace Corax
 		private void ReadLastDocumentId(Transaction tx)
 		{
 			var docs = StorageEnvironment.CreateTree(tx, "Docs");
-			using (var it = docs.Iterate(tx))
+			using (var it = docs.Iterate())
 			{
 				if (it.Seek(Slice.AfterAllKeys) == false)
 				{

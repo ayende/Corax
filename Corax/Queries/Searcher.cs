@@ -62,7 +62,7 @@ namespace Corax.Queries
 				.FirstOrDefault(ret => ret != 0);
 		}
 
-		public ValueReader GetTermForDocument(long docId, int fieldId)
+		public ValueReader? GetTermForDocument(long docId, int fieldId)
 		{
 			var buffer = _index.BufferPool.Take(FullTextIndex.DocumentFieldSize);
 			try
@@ -71,7 +71,7 @@ namespace Corax.Queries
 				EndianBitConverter.Big.CopyBytes(fieldId, buffer, sizeof(long));
 				EndianBitConverter.Big.CopyBytes(0, buffer, sizeof(long) + sizeof(int));
 
-				using (var it = _docs.Iterate(_tx))
+				using (var it = _docs.Iterate())
 				{
 					if (it.Seek(new Slice(buffer)) == false)
 						return null;

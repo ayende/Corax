@@ -41,7 +41,7 @@ namespace Corax.Queries
 			if (yVal == null)
 				return 1 * _factor;
 
-			var result = xVal.CompareTo(yVal) * _factor;
+			var result = xVal.Value.CompareTo(yVal.Value) * _factor;
 
 			return result;
 		}

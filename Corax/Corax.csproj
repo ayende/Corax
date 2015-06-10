@@ -75,7 +75,7 @@
     <Compile Include="Utils\Heap.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\ravendb-3.0\Raven.Voron\Voron\Voron.csproj">
+    <ProjectReference Include="..\..\ravendb\Raven.Voron\Voron\Voron.csproj">
       <Project>{FF83C7C2-BC7B-4DCC-A782-49EF9BBD9390}</Project>
       <Name>Voron</Name>
     </ProjectReference>
